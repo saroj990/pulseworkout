@@ -14,8 +14,8 @@
   --success: #059669;
   --danger: #dc2626;
   --shadow: 0 12px 40px rgba(20, 32, 30, 0.08);
-  --font-display: 'Syne', system-ui, sans-serif;
-  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-display: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --radius: 1.25rem;
   --page-pad: clamp(0.75rem, 3.5vw, 1rem);
   --title-size: clamp(1.55rem, 6.5vw, 1.875rem);
@@ -23,6 +23,22 @@
   --card-pad: clamp(0.85rem, 3.5vw, 1.1rem);
   --week-day-size: clamp(0.55rem, 2.6vw, 0.68rem);
   --week-label-size: clamp(0.5rem, 2.3vw, 0.62rem);
+  --sidebar-width: 16.5rem;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --page-pad: 1.5rem;
+    --title-size: 2.15rem;
+    --subtitle-size: 0.95rem;
+    --card-pad: 1.25rem;
+    --week-day-size: 0.72rem;
+    --week-label-size: 0.65rem;
+  }
+
+  body {
+    font-size: 1rem;
+  }
 }
 
 * {
@@ -57,7 +73,7 @@ h2,
 h3,
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
 }
 
 @keyframes fade-up {
@@ -206,11 +222,172 @@ select.input {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
 
+.app-shell {
+  min-height: 100svh;
+  width: 100%;
+}
+
+.app-content {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  padding: var(--page-pad);
+  padding-top: 0.75rem;
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+
+.page-frame {
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.desktop-sidebar {
+  display: none;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-inner {
+  display: flex;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem var(--page-pad);
+}
+
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  border-top: 1px solid var(--line);
+}
+
+.desktop-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.desktop-grid--2 {
+  grid-template-columns: 1fr;
+}
+
+.auth-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem;
+}
+
+.auth-hero-panel {
+  display: none;
+}
+
+.auth-form-panel {
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
+
+  .desktop-sidebar {
+    display: block;
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    border-right: 1px solid var(--line);
+  }
+
+  .app-topbar {
+    display: block;
+  }
+
+  .topbar-inner {
+    max-width: 72rem;
+    padding: 0.75rem 1.75rem;
+  }
+
+  .mobile-bottom-nav {
+    display: none;
+  }
+
+  .app-main {
+    padding: 1.5rem 1.75rem 2rem;
+  }
+
+  .page-frame {
+    max-width: 72rem;
+  }
+
+  .safe-bottom {
+    padding-bottom: 2rem;
+  }
+
+  .desktop-grid--2 {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    align-items: start;
+  }
+
+  .desktop-grid--stack-right {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .auth-shell {
+    max-width: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(22rem, 28rem);
+    min-height: 100svh;
+  }
+
+  .auth-hero-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem;
+    background:
+      radial-gradient(800px 500px at 20% 20%, #99f6e4 0%, transparent 55%),
+      radial-gradient(700px 420px at 80% 80%, #fed7aa 0%, transparent 50%),
+      linear-gradient(145deg, #0f766e 0%, #0b5550 55%, #134e4a 100%);
+    color: white;
+  }
+
+  .auth-form-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3rem;
+    background: color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+  }
+}
+
 .page-title {
   font-family: var(--font-display);
   font-size: var(--title-size);
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   line-height: 1.15;
 }
 

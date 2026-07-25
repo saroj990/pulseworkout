@@ -66,7 +66,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="animate-fade-up flex items-start justify-between gap-3">
+      <header className="animate-fade-up flex items-start justify-between gap-3 lg:hidden">
         <div>
           <p className="text-sm font-bold text-[var(--ink-muted)]">
             {format(new Date(), 'EEEE, MMM d')}
@@ -81,189 +81,208 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <section
-        className="glass animate-fade-up rounded-[var(--radius)] p-5 shadow-[var(--shadow)]"
-        style={{ animationDelay: '50ms' }}
-      >
-        <div className="flex items-center gap-5">
-          <ProgressRing
-            value={progress}
-            label={`${thisWeek.length}/${weeklyGoal}`}
-            sublabel="this week"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-xl font-bold">Weekly goal</p>
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              {goals?.focus || 'Stay consistent'}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {weekDays.map((d) => {
-                const key = format(d, 'yyyy-MM-dd')
-                const hit = thisWeek.some((w) => w.date === key)
-                const isToday = isSameDay(d, new Date())
-                return (
-                  <div
-                    key={key}
-                    title={key}
-                    className={`flex h-8 w-8 flex-col items-center justify-center rounded-lg text-[0.65rem] font-bold ${
-                      hit
-                        ? 'bg-[var(--brand)] text-white'
-                        : isToday
-                          ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                          : 'bg-white text-[var(--ink-muted)] border border-[var(--line)]'
-                    }`}
-                  >
-                    {format(d, 'EEEEE')}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+      <header className="animate-fade-up hidden items-end justify-between gap-4 lg:flex">
+        <div>
+          <h1 className="page-title">Hey, {user?.name.split(' ')[0]}</h1>
+          <p className="page-subtitle">
+            {goals?.focus || 'Stay consistent'} · {streak} day streak
+          </p>
         </div>
-      </section>
+        <div className="flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-extrabold text-[var(--accent)]">
+          <Flame size={16} />
+          {streak} day{streak === 1 ? '' : 's'}
+        </div>
+      </header>
 
-      <WaterQuickCard />
-
-      {!activePlan && (
-        <Link
-          to="/plans"
-          className="glass animate-fade-up flex items-center gap-3 rounded-[var(--radius)] p-4"
-          style={{ animationDelay: '70ms' }}
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
-            <CalendarDays size={22} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-bold">Choose a weekly plan</p>
-            <p className="text-xs text-[var(--ink-muted)]">
-              Bro split, PPL, or assign parts to each day yourself
-            </p>
-          </div>
-        </Link>
-      )}
-
-      {activePlan && todayPlan && (
-        <section
-          className="glass animate-fade-up rounded-[var(--radius)] p-4"
-          style={{ animationDelay: '70ms' }}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
-              {activePlan.name} · {WEEKDAY_LABELS[todayPlan.weekday]}
-            </p>
-            <Link to="/plans" className="text-xs font-bold text-[var(--ink-muted)]">
-              Change
-            </Link>
-          </div>
-          <h2 className="mt-1 font-display text-2xl font-bold">
-            {todayPlan.muscles.length === 0 ? 'Rest day' : todayPlan.title}
-          </h2>
-          {todayPlan.muscles.length > 0 && (
-            <>
-              <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                {todayPlan.muscles.map((m) => MUSCLE_LABELS[m]).join(' · ')} ·{' '}
-                {todayPlan.exerciseNames.length} exercises
-              </p>
-              {!todayWorkout && (
-                <Link to="/log?fromPlan=1" className="btn btn-accent mt-4 w-full">
-                  <Plus size={18} />
-                  Start today’s plan
-                </Link>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-      <section className="animate-fade-up" style={{ animationDelay: '100ms' }}>
-        {todayWorkout ? (
-          <div className="glass rounded-[var(--radius)] p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
-                  Today’s session
-                </p>
-                <h2 className="mt-1 font-display text-2xl font-bold">{todayWorkout.title}</h2>
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-muted)]">
-                  <Timer size={14} />
-                  {todayWorkout.durationMin} min · {todayWorkout.exercises.length} exercises
-                </p>
-              </div>
-              <Link to={`/history/${todayWorkout.id}`} className="btn btn-secondary text-sm px-3 py-2">
-                View
-              </Link>
-            </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-              {todayWorkout.exercises.slice(0, 5).map((ex) => (
-                <div key={`${ex.exerciseId}-${ex.exerciseName}`} className="shrink-0">
-                  <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <Link
-            to={todayPlan && todayPlan.muscles.length > 0 ? '/log?fromPlan=1' : '/log'}
-            className="group relative flex overflow-hidden rounded-[var(--radius)] bg-[var(--brand)] p-6 text-white shadow-[var(--shadow)]"
+      <div className="desktop-grid desktop-grid--2">
+        <div className="space-y-5">
+          <section
+            className="glass animate-fade-up rounded-[var(--radius)] p-5 shadow-[var(--shadow)]"
+            style={{ animationDelay: '50ms' }}
           >
-            <div className="relative z-10">
-              <p className="text-sm font-bold text-teal-100">Ready when you are</p>
-              <h2 className="mt-1 font-display text-2xl font-extrabold">
-                {todayPlan && todayPlan.muscles.length > 0
-                  ? `Log ${todayPlan.title}`
-                  : 'Log today’s workout'}
-              </h2>
-              <p className="mt-2 max-w-xs text-sm text-teal-50/90">
-                Track sets, reps, and weight — works fully offline.
-              </p>
-              <span className="btn mt-5 bg-white text-[var(--brand)]">
-                <Plus size={18} />
-                Start logging
-              </span>
-            </div>
-            <div className="pointer-events-none absolute -right-6 -top-6 h-40 w-40 rounded-full bg-white/10 transition group-hover:scale-110" />
-            <div className="pointer-events-none absolute -bottom-10 right-8 h-32 w-32 rounded-full bg-orange-400/30" />
-          </Link>
-        )}
-      </section>
-
-      {recent.length > 0 && (
-        <section className="animate-fade-up space-y-3" style={{ animationDelay: '150ms' }}>
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold">Recent</h2>
-            <Link to="/history" className="text-sm font-bold text-[var(--brand)]">
-              See all
-            </Link>
-          </div>
-          {recent.map((w, i) => (
-            <Link
-              key={w.id}
-              to={`/history/${w.id}`}
-              className="glass animate-slide-in flex items-center gap-3 rounded-2xl p-3"
-              style={{ animationDelay: `${i * 40}ms` }}
-            >
-              {w.exercises[0] ? (
-                <ExerciseImage
-                  imageKey={w.exercises[0].imageKey}
-                  muscle={w.exercises[0].muscle}
-                  size="sm"
-                />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-[var(--brand)]">
-                  <Timer size={20} />
+            <div className="flex items-center gap-5">
+              <ProgressRing
+                value={progress}
+                label={`${thisWeek.length}/${weeklyGoal}`}
+                sublabel="this week"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-display text-xl font-bold">Weekly goal</p>
+                <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                  {goals?.focus || 'Stay consistent'}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {weekDays.map((d) => {
+                    const key = format(d, 'yyyy-MM-dd')
+                    const hit = thisWeek.some((w) => w.date === key)
+                    const isToday = isSameDay(d, new Date())
+                    return (
+                      <div
+                        key={key}
+                        title={key}
+                        className={`flex h-8 w-8 flex-col items-center justify-center rounded-lg text-[0.65rem] font-bold lg:h-9 lg:w-9 ${
+                          hit
+                            ? 'bg-[var(--brand)] text-white'
+                            : isToday
+                              ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                              : 'bg-white text-[var(--ink-muted)] border border-[var(--line)]'
+                        }`}
+                      >
+                        {format(d, 'EEEEE')}
+                      </div>
+                    )
+                  })}
                 </div>
-              )}
-              <div className="min-w-0 flex-1 text-left">
-                <p className="truncate font-bold">{w.title}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="animate-fade-up" style={{ animationDelay: '100ms' }}>
+            {todayWorkout ? (
+              <div className="glass rounded-[var(--radius)] p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
+                      Today’s session
+                    </p>
+                    <h2 className="mt-1 font-display text-2xl font-bold">{todayWorkout.title}</h2>
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-muted)]">
+                      <Timer size={14} />
+                      {todayWorkout.durationMin} min · {todayWorkout.exercises.length} exercises
+                    </p>
+                  </div>
+                  <Link to={`/history/${todayWorkout.id}`} className="btn btn-secondary text-sm px-3 py-2">
+                    View
+                  </Link>
+                </div>
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                  {todayWorkout.exercises.slice(0, 5).map((ex) => (
+                    <div key={`${ex.exerciseId}-${ex.exerciseName}`} className="shrink-0">
+                      <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Link
+                to={todayPlan && todayPlan.muscles.length > 0 ? '/log?fromPlan=1' : '/log'}
+                className="group relative flex min-h-[12rem] overflow-hidden rounded-[var(--radius)] bg-[var(--brand)] p-6 text-white shadow-[var(--shadow)] lg:min-h-[14rem]"
+              >
+                <div className="relative z-10">
+                  <p className="text-sm font-bold text-teal-100">Ready when you are</p>
+                  <h2 className="mt-1 font-display text-2xl font-extrabold lg:text-3xl">
+                    {todayPlan && todayPlan.muscles.length > 0
+                      ? `Log ${todayPlan.title}`
+                      : 'Log today’s workout'}
+                  </h2>
+                  <p className="mt-2 max-w-xs text-sm text-teal-50/90">
+                    Track sets, reps, and weight — works fully offline.
+                  </p>
+                  <span className="btn mt-5 bg-white text-[var(--brand)]">
+                    <Plus size={18} />
+                    Start logging
+                  </span>
+                </div>
+                <div className="pointer-events-none absolute -right-6 -top-6 h-40 w-40 rounded-full bg-white/10 transition group-hover:scale-110" />
+                <div className="pointer-events-none absolute -bottom-10 right-8 h-32 w-32 rounded-full bg-orange-400/30" />
+              </Link>
+            )}
+          </section>
+
+          {recent.length > 0 && (
+            <section className="animate-fade-up space-y-3" style={{ animationDelay: '150ms' }}>
+              <div className="flex items-center justify-between">
+                <h2 className="font-display text-xl font-bold">Recent</h2>
+                <Link to="/history" className="text-sm font-bold text-[var(--brand)]">
+                  See all
+                </Link>
+              </div>
+              {recent.map((w, i) => (
+                <Link
+                  key={w.id}
+                  to={`/history/${w.id}`}
+                  className="glass animate-slide-in flex items-center gap-3 rounded-2xl p-3"
+                  style={{ animationDelay: `${i * 40}ms` }}
+                >
+                  {w.exercises[0] ? (
+                    <ExerciseImage
+                      imageKey={w.exercises[0].imageKey}
+                      muscle={w.exercises[0].muscle}
+                      size="sm"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-[var(--brand)]">
+                      <Timer size={20} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="truncate font-bold">{w.title}</p>
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      {format(parseISO(w.date), 'MMM d')} · {w.durationMin} min
+                      {w.exercises[0] && ` · ${MUSCLE_LABELS[w.exercises[0].muscle]}`}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </section>
+          )}
+        </div>
+
+        <div className="desktop-grid--stack-right space-y-5">
+          <WaterQuickCard />
+
+          {!activePlan && (
+            <Link
+              to="/plans"
+              className="glass animate-fade-up flex items-center gap-3 rounded-[var(--radius)] p-4"
+              style={{ animationDelay: '70ms' }}
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
+                <CalendarDays size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold">Choose a weekly plan</p>
                 <p className="text-xs text-[var(--ink-muted)]">
-                  {format(parseISO(w.date), 'MMM d')} · {w.durationMin} min
-                  {w.exercises[0] && ` · ${MUSCLE_LABELS[w.exercises[0].muscle]}`}
+                  Bro split, PPL, or assign parts to each day yourself
                 </p>
               </div>
             </Link>
-          ))}
-        </section>
-      )}
+          )}
+
+          {activePlan && todayPlan && (
+            <section
+              className="glass animate-fade-up rounded-[var(--radius)] p-4"
+              style={{ animationDelay: '70ms' }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
+                  {activePlan.name} · {WEEKDAY_LABELS[todayPlan.weekday]}
+                </p>
+                <Link to="/plans" className="text-xs font-bold text-[var(--ink-muted)]">
+                  Change
+                </Link>
+              </div>
+              <h2 className="mt-1 font-display text-2xl font-bold">
+                {todayPlan.muscles.length === 0 ? 'Rest day' : todayPlan.title}
+              </h2>
+              {todayPlan.muscles.length > 0 && (
+                <>
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                    {todayPlan.muscles.map((m) => MUSCLE_LABELS[m]).join(' · ')} ·{' '}
+                    {todayPlan.exerciseNames.length} exercises
+                  </p>
+                  {!todayWorkout && (
+                    <Link to="/log?fromPlan=1" className="btn btn-accent mt-4 w-full">
+                      <Plus size={18} />
+                      Start today’s plan
+                    </Link>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

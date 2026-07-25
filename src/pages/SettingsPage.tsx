@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays, Cloud, FileSpreadsheet, LogOut, Target } from 'lucide-react'
+import { CalendarDays, Cloud, FileSpreadsheet, LogOut, Target, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../db'
 import { exportToExcel, syncToGoogleDrive } from '../lib/sync'
+import { clearUserTrainingData, exportToCsv } from '../lib/dataActions'
 
 export function SettingsPage() {
   const { user, preferences, logout, updatePreferences } = useAuth()
   const [clientId, setClientId] = useState(preferences?.googleClientId ?? '')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState<'excel' | 'drive' | 'save' | null>(null)
+  const [busy, setBusy] = useState<'excel' | 'csv' | 'drive' | 'save' | 'clear' | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   useEffect(() => {
     setClientId(preferences?.googleClientId ?? '')
@@ -47,6 +49,37 @@ export function SettingsPage() {
       setMessage('Excel file downloaded.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onCsv() {
+    if (!user?.id) return
+    setBusy('csv')
+    setError('')
+    setMessage('')
+    try {
+      await exportToCsv(user.id)
+      setMessage('CSV files downloaded (workouts, water, summary).')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'CSV export failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onClear() {
+    if (!user?.id) return
+    setBusy('clear')
+    setError('')
+    setMessage('')
+    try {
+      await clearUserTrainingData(user.id)
+      setMessage('Workouts, water logs, and plans cleared. Your account is still signed in.')
+      setConfirmClear(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not clear data')
     } finally {
       setBusy(null)
     }
@@ -114,9 +147,13 @@ export function SettingsPage() {
           <FileSpreadsheet size={16} />
           {busy === 'excel' ? 'Exporting…' : 'Download Excel (.xlsx)'}
         </button>
+        <button type="button" className="btn btn-secondary w-full" onClick={onCsv} disabled={busy !== null}>
+          <FileSpreadsheet size={16} />
+          {busy === 'csv' ? 'Exporting…' : 'Export data to CSV'}
+        </button>
         {syncMeta?.lastExcelExportAt && (
           <p className="text-xs text-[var(--ink-muted)]">
-            Last Excel export: {format(parseISO(syncMeta.lastExcelExportAt), 'MMM d, yyyy HH:mm')}
+            Last export: {format(parseISO(syncMeta.lastExcelExportAt), 'MMM d, yyyy HH:mm')}
           </p>
         )}
 
@@ -159,7 +196,48 @@ export function SettingsPage() {
         </p>
       )}
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '100ms' }}>
+      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '100ms' }}>
+        <h2 className="font-display text-lg font-bold">Clear my data</h2>
+        <p className="text-sm text-[var(--ink-muted)]">
+          Removes workouts, water logs, and plans from this device. Your account, goals, and preferences stay.
+        </p>
+        {!confirmClear ? (
+          <button
+            type="button"
+            className="btn w-full border border-red-200 bg-red-50 text-[var(--danger)]"
+            onClick={() => setConfirmClear(true)}
+            disabled={busy !== null}
+          >
+            <Trash2 size={16} /> Clear my data
+          </button>
+        ) : (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-3">
+            <p className="text-sm font-semibold text-[var(--danger)]">
+              This can’t be undone. Export a CSV first if you want a backup.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary flex-1"
+                onClick={() => setConfirmClear(false)}
+                disabled={busy !== null}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn flex-1 bg-[var(--danger)] text-white"
+                onClick={onClear}
+                disabled={busy !== null}
+              >
+                {busy === 'clear' ? 'Clearing…' : 'Yes, clear'}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '110ms' }}>
         <h2 className="font-display text-lg font-bold">Offline</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Pulse is a PWA. Install it to your home screen for app-like use. All logging works without a network.
