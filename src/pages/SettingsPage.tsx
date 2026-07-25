@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../db'
 import { exportToExcel, syncToGoogleDrive } from '../lib/sync'
 import { clearUserTrainingData, exportToCsv } from '../lib/dataActions'
+import { PinSettingsCard } from '../components/PinSettingsCard'
 
 export function SettingsPage() {
   const { user, preferences, logout, updatePreferences } = useAuth()
@@ -136,6 +137,8 @@ export function SettingsPage() {
           <CalendarDays size={16} /> Open plans
         </Link>
       </section>
+
+      <PinSettingsCard />
 
       <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '60ms' }}>
         <h2 className="font-display text-lg font-bold">Export & sync</h2>
