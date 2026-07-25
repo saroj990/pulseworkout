@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { PinLockProvider, usePinLock } from './context/PinLockContext'
 import { AppShell } from './components/AppShell'
+import { PinLockScreen } from './components/PinLockScreen'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { OnboardingPage } from './pages/OnboardingPage'
@@ -14,6 +16,8 @@ import { WaterPage } from './pages/WaterPage'
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, preferences, loading } = useAuth()
+  const { locked } = usePinLock()
+
   if (loading) {
     return (
       <div className="flex min-h-svh items-center justify-center">
@@ -23,6 +27,7 @@ function Protected({ children }: { children: React.ReactNode }) {
   }
   if (!user) return <Navigate to="/login" replace />
   if (!preferences?.onboardingDone) return <Navigate to="/onboarding" replace />
+  if (locked) return <PinLockScreen />
   return children
 }
 
@@ -37,42 +42,44 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            <PublicOnly>
-              <LoginPage />
-            </PublicOnly>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <PublicOnly>
-              <RegisterPage />
-            </PublicOnly>
-          }
-        />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route
-          element={
-            <Protected>
-              <AppShell />
-            </Protected>
-          }
-        >
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/log" element={<LogWorkoutPage />} />
-          <Route path="/water" element={<WaterPage />} />
-          <Route path="/plans" element={<PlansPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/history/:id" element={<WorkoutDetailPage />} />
-          <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <PinLockProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <PublicOnly>
+                <LoginPage />
+              </PublicOnly>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <PublicOnly>
+                <RegisterPage />
+              </PublicOnly>
+            }
+          />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route
+            element={
+              <Protected>
+                <AppShell />
+              </Protected>
+            }
+          >
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/log" element={<LogWorkoutPage />} />
+            <Route path="/water" element={<WaterPage />} />
+            <Route path="/plans" element={<PlansPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/history/:id" element={<WorkoutDetailPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </PinLockProvider>
     </AuthProvider>
   )
 }

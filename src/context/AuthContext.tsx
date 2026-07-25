@@ -17,6 +17,7 @@ import {
   setSessionUserId,
 } from '../lib/auth'
 import { getOldDataSummary, type OldDataSummary } from '../lib/storageAlert'
+import { notifyAuthenticated } from '../lib/pin'
 
 interface AuthContextValue {
   user: User | null
@@ -138,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStorageAlert(null)
       setSessionUserId(id)
       await loadUser(id)
+      notifyAuthenticated()
     },
     [loadUser],
   )
@@ -155,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSessionUserId(u.id!)
       await loadUser(u.id!)
+      notifyAuthenticated()
     },
     [loadUser],
   )

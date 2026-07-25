@@ -29,6 +29,9 @@ export interface Preferences {
   preferredMuscles: MuscleGroup[]
   googleClientId: string
   onboardingDone: boolean
+  pinEnabled?: boolean
+  pinHash?: string
+  pinSalt?: string
 }
 
 export interface Goals {
