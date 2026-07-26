@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
@@ -7,29 +7,43 @@ import {
   ChevronDown,
   CircleCheck,
   Minus,
+  Play,
   Plus,
   Search,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db, type Exercise, type MuscleGroup, type WorkoutExercise, type WorkoutSet } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
+import { getExerciseDefault } from '../data/exerciseDefaults'
 import { ExerciseImage } from '../components/ExerciseImage'
-import { PART_WORKOUTS, getPlanDayForDate } from '../data/plans'
+import { ProgressRing } from '../components/ProgressRing'
+import { PART_WORKOUTS, WEEKDAY_FULL, getPlanDayForDate, type Weekday } from '../data/plans'
 import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
+import {
+  AUTO_COMPLETE_AFTER_PROMPT_SEC,
+  PROMPT_GRACE_SEC,
+  clearWorkoutSession,
+  formatClock,
+  loadWorkoutSession,
+  saveWorkoutSession,
+  type WorkoutSessionState,
+} from '../lib/workoutSession'
 
-function emptySet(): WorkoutSet {
-  return { reps: 0, weight: 0, completed: false }
+function emptySet(reps = 0, weight = 0): WorkoutSet {
+  return { reps, weight, completed: false }
 }
 
-function toWorkoutExercise(ex: Exercise): WorkoutExercise {
+function toWorkoutExercise(ex: Exercise, units: 'kg' | 'lbs'): WorkoutExercise {
+  const def = getExerciseDefault(ex.name, ex.muscle, units)
   return {
     exerciseId: ex.id!,
     exerciseName: ex.name,
     muscle: ex.muscle,
     imageKey: ex.imageKey,
-    sets: [emptySet(), emptySet(), emptySet()],
+    sets: Array.from({ length: def.sets }, () => emptySet(def.reps, def.weightKg)),
   }
 }
 
@@ -46,12 +60,11 @@ function validateWorkout(input: {
   date: string
   duration: string
   selected: WorkoutExercise[]
+  requireSets: boolean
 }): FieldErrors {
   const errors: FieldErrors = {}
 
-  if (!input.title.trim()) {
-    errors.title = 'Add a workout title.'
-  }
+  if (!input.title.trim()) errors.title = 'Add a workout title.'
 
   if (!input.date) {
     errors.date = 'Choose a date.'
@@ -68,21 +81,17 @@ function validateWorkout(input: {
 
   if (input.selected.length === 0) {
     errors.exercises = 'Add at least one exercise.'
-  } else {
+  } else if (input.requireSets) {
     const missingSets = input.selected.some((ex) => ex.sets.length === 0)
     if (missingSets) {
       errors.sets = 'Each exercise needs at least one set.'
     } else {
       const badReps = input.selected.some((ex) => ex.sets.some((s) => s.reps <= 0))
-      if (badReps) {
-        errors.sets = 'Every set needs reps greater than 0.'
-      }
+      if (badReps) errors.sets = 'Every set needs reps greater than 0.'
       const badWeight = input.selected.some((ex) =>
         ex.sets.some((s) => !Number.isFinite(s.weight) || s.weight < 0),
       )
-      if (!errors.sets && badWeight) {
-        errors.sets = 'Weight can’t be negative.'
-      }
+      if (!errors.sets && badWeight) errors.sets = 'Weight can’t be negative.'
     }
   }
 
@@ -90,12 +99,13 @@ function validateWorkout(input: {
 }
 
 export function LogWorkoutPage() {
-  const { user, preferences } = useAuth()
+  const { user, preferences, goals } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const units = preferences?.units ?? 'kg'
   const restSeconds = preferences?.restSeconds ?? 90
   const prefillsApplied = useRef(false)
+  const completingRef = useRef(false)
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const exercises = useLiveQuery(() => db.exercises.toArray(), [])
@@ -104,9 +114,17 @@ export function LogWorkoutPage() {
     return db.userPlans.where('userId').equals(user.id).filter((p) => p.active).first()
   }, [user?.id])
 
+  const recentWorkouts = useLiveQuery(async () => {
+    if (!user?.id) return []
+    const all = await db.workouts.where('userId').equals(user.id).toArray()
+    return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 40)
+  }, [user?.id])
+
+  const defaultDuration = String(goals?.dailyMinutes && goals.dailyMinutes > 0 ? goals.dailyMinutes : 45)
+
   const [title, setTitle] = useState(`Workout — ${format(new Date(), 'MMM d')}`)
   const [date, setDate] = useState(today)
-  const [duration, setDuration] = useState('0')
+  const [duration, setDuration] = useState(defaultDuration)
   const [notes, setNotes] = useState('')
   const [selected, setSelected] = useState<WorkoutExercise[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -115,7 +133,11 @@ export function LogWorkoutPage() {
   const [restLeft, setRestLeft] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [session, setSession] = useState<WorkoutSessionState | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const [showCompletePrompt, setShowCompletePrompt] = useState(false)
 
   const existingForDate = useLiveQuery(async () => {
     if (!user?.id || !date) return undefined
@@ -127,11 +149,58 @@ export function LogWorkoutPage() {
     return matches.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
   }, [user?.id, date])
 
-  const alreadyLogged = Boolean(existingForDate)
+  const alreadyLogged = Boolean(existingForDate) && !session
   const isToday = date === today
 
+  const planDay = useMemo(() => {
+    if (!activePlan) return undefined
+    const d = new Date(`${date}T12:00:00`)
+    return getPlanDayForDate(activePlan.days, d)
+  }, [activePlan, date])
+
+  const recentExerciseIds = useMemo(() => {
+    const ids: number[] = []
+    const seen = new Set<number>()
+    for (const w of recentWorkouts ?? []) {
+      for (const ex of w.exercises) {
+        if (!seen.has(ex.exerciseId)) {
+          seen.add(ex.exerciseId)
+          ids.push(ex.exerciseId)
+        }
+      }
+    }
+    return ids
+  }, [recentWorkouts])
+
+  // Restore active session
   useEffect(() => {
-    if (prefillsApplied.current || !exercises?.length || alreadyLogged) return
+    if (!user?.id) return
+    const saved = loadWorkoutSession(user.id)
+    if (!saved) return
+    setSession(saved)
+    setTitle(saved.title)
+    setDate(saved.date)
+    setDuration(String(saved.durationMin))
+    setNotes(saved.notes)
+    setSelected(saved.exercises)
+    prefillsApplied.current = true
+  }, [user?.id])
+
+  // Tick clock while session runs
+  useEffect(() => {
+    if (!session) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [session])
+
+  // Keep session storage in sync
+  useEffect(() => {
+    if (!session) return
+    saveWorkoutSession({ ...session, exercises: selected, title, notes, date })
+  }, [session, selected, title, notes, date])
+
+  useEffect(() => {
+    if (prefillsApplied.current || !exercises?.length || alreadyLogged || session) return
 
     const part = searchParams.get('part') as MuscleGroup | null
     const fromPlan = searchParams.get('fromPlan') === '1'
@@ -144,8 +213,9 @@ export function LogWorkoutPage() {
         .filter((e): e is Exercise => Boolean(e?.id))
       if (picked.length) {
         setTitle(workout.title)
-        setSelected(picked.map(toWorkoutExercise))
+        setSelected(picked.map((e) => toWorkoutExercise(e, units)))
         setMuscleFilter(part)
+        setDuration(defaultDuration)
         prefillsApplied.current = true
       }
       return
@@ -159,23 +229,108 @@ export function LogWorkoutPage() {
           .filter((e): e is Exercise => Boolean(e?.id))
         if (picked.length) {
           setTitle(day.title)
-          setSelected(picked.map(toWorkoutExercise))
+          setSelected(picked.map((e) => toWorkoutExercise(e, units)))
           if (day.muscles.length === 1) setMuscleFilter(day.muscles[0])
+          setDuration(defaultDuration)
           prefillsApplied.current = true
         }
       }
     }
-  }, [exercises, activePlan, searchParams, alreadyLogged])
+  }, [exercises, activePlan, searchParams, alreadyLogged, session, units, defaultDuration])
 
   const filtered = useMemo(() => {
     const list = exercises ?? []
-    return list.filter((ex) => {
-      const q = query.trim().toLowerCase()
-      const matchQ = !q || ex.name.toLowerCase().includes(q)
-      const matchM = muscleFilter === 'all' || ex.muscle === muscleFilter
-      return matchQ && matchM
-    })
-  }, [exercises, query, muscleFilter])
+    const recentRank = new Map(recentExerciseIds.map((id, i) => [id, i]))
+    return list
+      .filter((ex) => {
+        const q = query.trim().toLowerCase()
+        const matchQ = !q || ex.name.toLowerCase().includes(q)
+        const matchM = muscleFilter === 'all' || ex.muscle === muscleFilter
+        return matchQ && matchM
+      })
+      .sort((a, b) => {
+        const ar = a.id != null && recentRank.has(a.id) ? recentRank.get(a.id)! : 9999
+        const br = b.id != null && recentRank.has(b.id) ? recentRank.get(b.id)! : 9999
+        if (ar !== br) return ar - br
+        return a.name.localeCompare(b.name)
+      })
+  }, [exercises, query, muscleFilter, recentExerciseIds])
+
+  const elapsedSec = session ? Math.floor((now - session.startedAt) / 1000) : 0
+  const targetSec = (session?.durationMin ?? parseNumeric(duration, 0)) * 60
+  const promptAtSec = targetSec + PROMPT_GRACE_SEC
+  const autoCompleteAtSec =
+    session?.promptShownAt != null
+      ? Math.floor((session.promptShownAt - session.startedAt) / 1000) + AUTO_COMPLETE_AFTER_PROMPT_SEC
+      : promptAtSec + AUTO_COMPLETE_AFTER_PROMPT_SEC
+
+  const persistWorkout = useCallback(async () => {
+    if (!user?.id || completingRef.current) return
+    completingRef.current = true
+    setBusy(true)
+    setError('')
+    try {
+      const durationMin = session?.durationMin ?? parseNumeric(duration, 0)
+      const workoutDate = session?.date ?? date
+      const workoutTitle = title.trim()
+      const workoutNotes = notes.trim()
+      const workoutExercises = selected
+
+      const duplicate = await db.workouts
+        .where('userId')
+        .equals(user.id)
+        .filter((w) => w.date === workoutDate)
+        .first()
+      if (duplicate) {
+        clearWorkoutSession()
+        setSession(null)
+        setShowCompletePrompt(false)
+        navigate(`/history/${duplicate.id}`)
+        return
+      }
+
+      const nowIso = new Date().toISOString()
+      const id = await db.workouts.add({
+        userId: user.id,
+        date: workoutDate,
+        title: workoutTitle,
+        notes: workoutNotes,
+        durationMin: Math.max(1, Math.round(elapsedSec / 60) || durationMin),
+        exercises: workoutExercises,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      })
+      clearWorkoutSession()
+      setSession(null)
+      setShowCompletePrompt(false)
+      navigate(`/history/${id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not complete workout')
+      completingRef.current = false
+    } finally {
+      setBusy(false)
+    }
+  }, [user?.id, session, duration, date, title, notes, selected, elapsedSec, navigate])
+
+  // Prompt / auto-complete timers
+  useEffect(() => {
+    if (!session || completingRef.current) return
+
+    if (elapsedSec >= promptAtSec && !session.promptShownAt) {
+      const promptShownAt = Date.now()
+      setSession((prev) => (prev ? { ...prev, promptShownAt } : prev))
+      setShowCompletePrompt(true)
+      return
+    }
+
+    if (
+      session.promptShownAt &&
+      elapsedSec >= autoCompleteAtSec &&
+      !completingRef.current
+    ) {
+      void persistWorkout()
+    }
+  }, [session, elapsedSec, promptAtSec, autoCompleteAtSec, persistWorkout])
 
   function clearFieldError(key: keyof FieldErrors) {
     setFieldErrors((prev) => {
@@ -186,10 +341,30 @@ export function LogWorkoutPage() {
     })
   }
 
+  function applyPreset(exerciseNames: string[], presetTitle: string, muscle?: MuscleGroup) {
+    if (!exercises?.length || alreadyLogged) return
+    const byName = new Map(exercises.map((e) => [e.name, e]))
+    const picked = exerciseNames
+      .map((n) => byName.get(n))
+      .filter((e): e is Exercise => Boolean(e?.id))
+    if (!picked.length) {
+      setError('Couldn’t load that preset — exercises missing from the library.')
+      return
+    }
+    setTitle(presetTitle)
+    setSelected(picked.map((e) => toWorkoutExercise(e, units)))
+    if (muscle) setMuscleFilter(muscle)
+    setMessage('Preset loaded — tweak anything before you start.')
+    setError('')
+    clearFieldError('exercises')
+    clearFieldError('sets')
+  }
+
   function addExercise(ex: Exercise) {
     if (alreadyLogged || !ex.id) return
     if (selected.some((s) => s.exerciseId === ex.id)) return
-    setSelected((prev) => [...prev, toWorkoutExercise(ex)])
+    // Newest on top
+    setSelected((prev) => [toWorkoutExercise(ex, units), ...prev])
     clearFieldError('exercises')
     clearFieldError('sets')
     setPickerOpen(false)
@@ -213,7 +388,14 @@ export function LogWorkoutPage() {
   function addSet(exIdx: number) {
     if (alreadyLogged) return
     setSelected((prev) =>
-      prev.map((ex, i) => (i === exIdx ? { ...ex, sets: [...ex.sets, emptySet()] } : ex)),
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex
+        const last = ex.sets[ex.sets.length - 1]
+        return {
+          ...ex,
+          sets: [...ex.sets, emptySet(last?.reps ?? 10, last?.weight ?? 0)],
+        }
+      }),
     )
     clearFieldError('sets')
   }
@@ -228,7 +410,7 @@ export function LogWorkoutPage() {
   }
 
   function removeExercise(exIdx: number) {
-    if (alreadyLogged) return
+    if (alreadyLogged || session) return
     setSelected((prev) => prev.filter((_, i) => i !== exIdx))
   }
 
@@ -246,48 +428,127 @@ export function LogWorkoutPage() {
     }, 1000)
   }
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault()
-    if (!user?.id || alreadyLogged) return
+  async function onSaveToPlan(e?: FormEvent) {
+    e?.preventDefault()
+    if (!user?.id || alreadyLogged || session) return
 
-    const errors = validateWorkout({ title, date, duration, selected })
+    const errors = validateWorkout({
+      title,
+      date,
+      duration,
+      selected,
+      requireSets: false,
+    })
+    // Duration not required just to save plan — drop that error
+    delete errors.duration
     setFieldErrors(errors)
-    if (Object.keys(errors).length > 0) {
-      setError('Please fix the highlighted fields before saving.')
+    if (errors.title || errors.date || errors.exercises) {
+      setError('Add a title and at least one exercise to save to your plan.')
       return
     }
 
     setBusy(true)
     setError('')
+    setMessage('')
     try {
-      const duplicate = await db.workouts
-        .where('userId')
-        .equals(user.id)
-        .filter((w) => w.date === date)
-        .first()
-      if (duplicate) {
-        setError('A workout is already logged for this day.')
-        setBusy(false)
-        return
+      const weekday = new Date(`${date}T12:00:00`).getDay() as Weekday
+      const muscles = [...new Set(selected.map((s) => s.muscle))]
+      const exerciseNames = selected.map((s) => s.exerciseName)
+      const dayPatch = {
+        weekday,
+        muscles,
+        title: title.trim(),
+        exerciseNames,
       }
 
-      const now = new Date().toISOString()
-      const id = await db.workouts.add({
-        userId: user.id,
-        date,
-        title: title.trim(),
-        notes: notes.trim(),
-        durationMin: parseNumeric(duration, 0),
-        exercises: selected,
-        createdAt: now,
-        updatedAt: now,
-      })
-      navigate(`/history/${id}`)
+      if (activePlan?.id) {
+        const days = ([0, 1, 2, 3, 4, 5, 6] as Weekday[]).map((wd) => {
+          const existing = activePlan.days.find((d) => d.weekday === wd)
+          if (wd === weekday) return dayPatch
+          return (
+            existing ?? {
+              weekday: wd,
+              muscles: [],
+              title: 'Rest',
+              exerciseNames: [],
+            }
+          )
+        })
+        await db.userPlans.update(activePlan.id, {
+          days,
+          updatedAt: new Date().toISOString(),
+        })
+      } else {
+        const days = ([0, 1, 2, 3, 4, 5, 6] as Weekday[]).map((wd) =>
+          wd === weekday
+            ? dayPatch
+            : { weekday: wd, muscles: [], title: 'Rest', exerciseNames: [] },
+        )
+        await db.userPlans.add({
+          userId: user.id,
+          templateId: 'custom',
+          name: 'My plan',
+          days,
+          active: true,
+          updatedAt: new Date().toISOString(),
+        })
+      }
+      setMessage(`Saved to plan for ${WEEKDAY_FULL[weekday]}.`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save workout')
+      setError(err instanceof Error ? err.message : 'Could not save to plan')
     } finally {
       setBusy(false)
     }
+  }
+
+  function onStartWorkout() {
+    if (!user?.id || alreadyLogged || session) return
+    const errors = validateWorkout({
+      title,
+      date,
+      duration,
+      selected,
+      requireSets: true,
+    })
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      setError('Fix the highlighted fields before starting.')
+      return
+    }
+
+    const next: WorkoutSessionState = {
+      userId: user.id,
+      startedAt: Date.now(),
+      durationMin: parseNumeric(duration, 0),
+      title: title.trim(),
+      date,
+      notes: notes.trim(),
+      exercises: selected,
+      promptShownAt: null,
+      promptDismissed: false,
+    }
+    setSession(next)
+    saveWorkoutSession(next)
+    setError('')
+    setMessage('')
+    setShowCompletePrompt(false)
+  }
+
+  async function onCompleteManual() {
+    const errors = validateWorkout({
+      title,
+      date,
+      duration,
+      selected,
+      requireSets: true,
+    })
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      setError('Fix sets before completing.')
+      setShowCompletePrompt(false)
+      return
+    }
+    await persistWorkout()
   }
 
   const muscles: Array<MuscleGroup | 'all'> = [
@@ -301,6 +562,9 @@ export function LogWorkoutPage() {
     'cardio',
     'full',
   ]
+
+  const ringProgress = targetSec > 0 ? Math.min(1, elapsedSec / targetSec) : 0
+  const overtime = elapsedSec > targetSec
 
   if (alreadyLogged && existingForDate) {
     return (
@@ -340,11 +604,7 @@ export function LogWorkoutPage() {
               Open history
             </Link>
             {!isToday && (
-              <button
-                type="button"
-                className="btn btn-ghost w-full"
-                onClick={() => setDate(today)}
-              >
+              <button type="button" className="btn btn-ghost w-full" onClick={() => setDate(today)}>
                 Switch to today
               </button>
             )}
@@ -357,15 +617,12 @@ export function LogWorkoutPage() {
           </label>
           <input
             id="other-date"
-            className="input"
+            className="input input-date-compact"
             type="date"
             max={today}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
-          <p className="mt-2 text-xs text-[var(--ink-muted)]">
-            Pick an open date with no session yet to start a new log.
-          </p>
         </section>
       </div>
     )
@@ -374,13 +631,55 @@ export function LogWorkoutPage() {
   return (
     <div className="space-y-5">
       <header className="animate-fade-up">
-        <h1 className="font-display text-3xl font-extrabold">Log workout</h1>
+        <h1 className="font-display text-3xl font-extrabold">
+          {session ? 'Workout in progress' : 'Log workout'}
+        </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          Everything saves to IndexedDB on this device.
+          {session
+            ? 'Finish manually anytime — we’ll nudge you after your set time.'
+            : 'Build a session, save it to your plan, or start the timer.'}
         </p>
       </header>
 
-      <form onSubmit={onSave} className="space-y-4" noValidate>
+      {session && (
+        <section className="glass animate-fade-up flex flex-col items-center rounded-[var(--radius)] p-5">
+          <ProgressRing
+            value={overtime ? 1 : ringProgress}
+            size={160}
+            stroke={12}
+            label={formatClock(elapsedSec)}
+            sublabel={
+              overtime
+                ? `+${formatClock(elapsedSec - targetSec)} over`
+                : `${formatClock(Math.max(0, targetSec - elapsedSec))} left`
+            }
+          />
+          <p className="mt-3 text-sm text-[var(--ink-muted)]">
+            Target {session.durationMin} min
+            {session.promptShownAt
+              ? ' · awaiting confirmation to wrap up'
+              : ''}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary mt-4 w-full max-w-xs"
+            onClick={() => void onCompleteManual()}
+            disabled={busy}
+          >
+            {busy ? 'Saving…' : 'Complete workout'}
+          </button>
+        </section>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (session) void onCompleteManual()
+          else void onSaveToPlan(e)
+        }}
+        className="space-y-4"
+        noValidate
+      >
         <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
           <div>
             <label className="label" htmlFor="title">Title</label>
@@ -392,18 +691,19 @@ export function LogWorkoutPage() {
                 setTitle(e.target.value)
                 clearFieldError('title')
               }}
+              disabled={Boolean(session)}
               required
             />
             {fieldErrors.title && (
               <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.title}</p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2 sm:grid-cols-2 sm:gap-3">
+            <div className="min-w-0">
               <label className="label" htmlFor="date">Date</label>
               <input
                 id="date"
-                className={`input ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
+                className={`input input-date-compact ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
                 type="date"
                 max={today}
                 value={date}
@@ -412,13 +712,14 @@ export function LogWorkoutPage() {
                   clearFieldError('date')
                   setError('')
                 }}
+                disabled={Boolean(session)}
                 required
               />
               {fieldErrors.date && (
                 <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.date}</p>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="label" htmlFor="duration">Minutes</label>
               <input
                 id="duration"
@@ -430,7 +731,8 @@ export function LogWorkoutPage() {
                   setDuration(sanitizeNumericInput(e.target.value))
                   clearFieldError('duration')
                 }}
-                onBlur={() => setDuration(toNumericString(duration, '0'))}
+                onBlur={() => setDuration(toNumericString(duration, defaultDuration))}
+                disabled={Boolean(session)}
                 required
               />
               {fieldErrors.duration && (
@@ -450,6 +752,39 @@ export function LogWorkoutPage() {
           </div>
         </section>
 
+        {!session && (
+          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-[var(--brand)]" />
+              <h2 className="font-display text-base font-bold">Presets</h2>
+            </div>
+            <p className="text-xs text-[var(--ink-muted)]">
+              Based on your plan day and workout type. Apply, then edit freely.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {planDay && planDay.muscles.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-accent px-3 py-1.5 text-xs"
+                  onClick={() => applyPreset(planDay.exerciseNames, planDay.title, planDay.muscles[0])}
+                >
+                  Today’s plan · {planDay.title}
+                </button>
+              )}
+              {(Object.keys(PART_WORKOUTS) as MuscleGroup[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-bold hover:border-[var(--brand)]"
+                  onClick={() => applyPreset(PART_WORKOUTS[m].exerciseNames, PART_WORKOUTS[m].title, m)}
+                >
+                  {PART_WORKOUTS[m].title}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="flex items-center justify-between animate-fade-up">
           <h2 className="font-display text-xl font-bold">Exercises</h2>
           <div className="flex gap-2">
@@ -462,9 +797,15 @@ export function LogWorkoutPage() {
                 Rest timer
               </button>
             )}
-            <button type="button" className="btn btn-accent px-3 py-1.5 text-sm" onClick={() => setPickerOpen(true)}>
-              <Plus size={16} /> Add
-            </button>
+            {!session && (
+              <button
+                type="button"
+                className="btn btn-accent px-3 py-1.5 text-sm"
+                onClick={() => setPickerOpen(true)}
+              >
+                <Plus size={16} /> Add
+              </button>
+            )}
           </div>
         </div>
 
@@ -504,9 +845,16 @@ export function LogWorkoutPage() {
                 <p className="truncate font-bold">{ex.exerciseName}</p>
                 <p className="text-xs text-[var(--ink-muted)]">{MUSCLE_LABELS[ex.muscle]}</p>
               </div>
-              <button type="button" className="btn btn-ghost p-2" onClick={() => removeExercise(exIdx)} aria-label="Remove">
-                <Trash2 size={16} />
-              </button>
+              {!session && (
+                <button
+                  type="button"
+                  className="btn btn-ghost p-2"
+                  onClick={() => removeExercise(exIdx)}
+                  aria-label="Remove"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
 
             <div className="mt-3 space-y-2">
@@ -566,19 +914,42 @@ export function LogWorkoutPage() {
                 </div>
               ))}
             </div>
-            <button type="button" className="btn btn-secondary mt-3 w-full py-2 text-sm" onClick={() => addSet(exIdx)}>
+            <button
+              type="button"
+              className="btn btn-secondary mt-3 w-full py-2 text-sm"
+              onClick={() => addSet(exIdx)}
+            >
               <Plus size={14} /> Add set
             </button>
           </section>
         ))}
 
         {error && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">{error}</p>
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="rounded-xl bg-[var(--brand-soft)] px-3 py-2 text-sm font-semibold text-[var(--brand)]">
+            {message}
+          </p>
         )}
 
-        <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-          {busy ? 'Saving…' : 'Save workout'}
-        </button>
+        {!session ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
+              {busy ? 'Saving…' : 'Save to plan'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary w-full"
+              disabled={busy}
+              onClick={onStartWorkout}
+            >
+              <Play size={16} /> Start workout
+            </button>
+          </div>
+        ) : null}
       </form>
 
       {pickerOpen && (
@@ -617,6 +988,11 @@ export function LogWorkoutPage() {
                   </button>
                 ))}
               </div>
+              {recentExerciseIds.length > 0 && (
+                <p className="text-xs font-semibold text-[var(--ink-muted)]">
+                  Recent exercises are listed first
+                </p>
+              )}
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto px-4 pb-6">
               {filtered.map((ex) => (
@@ -631,6 +1007,7 @@ export function LogWorkoutPage() {
                     <p className="font-bold">{ex.name}</p>
                     <p className="text-xs text-[var(--ink-muted)]">
                       {MUSCLE_LABELS[ex.muscle]} · {ex.equipment}
+                      {ex.id != null && recentExerciseIds.includes(ex.id) ? ' · Recent' : ''}
                     </p>
                   </div>
                   <ChevronDown className="-rotate-90 text-[var(--ink-muted)]" size={16} />
@@ -639,6 +1016,41 @@ export function LogWorkoutPage() {
               {filtered.length === 0 && (
                 <p className="py-8 text-center text-sm text-[var(--ink-muted)]">No exercises found.</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCompletePrompt && session && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-5">
+          <div className="w-full max-w-sm rounded-[var(--radius)] bg-white p-5 shadow-xl animate-fade-up">
+            <h3 className="font-display text-xl font-bold">Wrap up this workout?</h3>
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">
+              You’re past your {session.durationMin}-minute target (plus a 10‑minute buffer). Confirm
+              to save now. If there’s no confirmation, it’ll complete automatically in about 20
+              minutes.
+            </p>
+            <div className="mt-5 grid gap-2">
+              <button
+                type="button"
+                className="btn btn-primary w-full"
+                disabled={busy}
+                onClick={() => void onCompleteManual()}
+              >
+                {busy ? 'Saving…' : 'Yes, complete now'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary w-full"
+                onClick={() => {
+                  setShowCompletePrompt(false)
+                  setSession((prev) =>
+                    prev ? { ...prev, promptDismissed: true } : prev,
+                  )
+                }}
+              >
+                Not yet — keep going
+              </button>
             </div>
           </div>
         </div>
