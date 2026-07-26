@@ -167,10 +167,11 @@ export function HistoryPage() {
           <div className="relative">
             <Search
               size={16}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]"
+              className="pointer-events-none absolute left-3.5 top-1/2 z-[1] -translate-y-1/2 text-[var(--ink-muted)]"
+              aria-hidden
             />
             <input
-              className="input pl-10"
+              className="input input-with-icon"
               type="search"
               placeholder="Search by title or exercise"
               value={query}

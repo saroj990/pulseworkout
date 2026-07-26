@@ -7,10 +7,12 @@ import {
   ChevronDown,
   CircleCheck,
   Minus,
+  Pause,
   Play,
   Plus,
   Search,
   Sparkles,
+  Timer,
   Trash2,
   X,
 } from 'lucide-react'
@@ -19,16 +21,18 @@ import { db, type Exercise, type MuscleGroup, type WorkoutExercise, type Workout
 import { MUSCLE_LABELS } from '../data/exercises'
 import { getExerciseDefault } from '../data/exerciseDefaults'
 import { ExerciseImage } from '../components/ExerciseImage'
-import { ProgressRing } from '../components/ProgressRing'
 import { PART_WORKOUTS, WEEKDAY_FULL, getPlanDayForDate, type Weekday } from '../data/plans'
 import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
 import {
   AUTO_COMPLETE_AFTER_PROMPT_SEC,
+  BETWEEN_EXERCISE_REST_SEC,
   PROMPT_GRACE_SEC,
   clearWorkoutSession,
   formatClock,
+  isExerciseDone,
   loadWorkoutSession,
   saveWorkoutSession,
+  sessionElapsedSec,
   type WorkoutSessionState,
 } from '../lib/workoutSession'
 
@@ -106,6 +110,7 @@ export function LogWorkoutPage() {
   const restSeconds = preferences?.restSeconds ?? 90
   const prefillsApplied = useRef(false)
   const completingRef = useRef(false)
+  const exerciseRefs = useRef<Record<number, HTMLElement | null>>({})
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const exercises = useLiveQuery(() => db.exercises.toArray(), [])
@@ -172,7 +177,6 @@ export function LogWorkoutPage() {
     return ids
   }, [recentWorkouts])
 
-  // Restore active session
   useEffect(() => {
     if (!user?.id) return
     const saved = loadWorkoutSession(user.id)
@@ -186,14 +190,12 @@ export function LogWorkoutPage() {
     prefillsApplied.current = true
   }, [user?.id])
 
-  // Tick clock while session runs
   useEffect(() => {
     if (!session) return
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [session])
 
-  // Keep session storage in sync
   useEffect(() => {
     if (!session) return
     saveWorkoutSession({ ...session, exercises: selected, title, notes, date })
@@ -256,13 +258,79 @@ export function LogWorkoutPage() {
       })
   }, [exercises, query, muscleFilter, recentExerciseIds])
 
-  const elapsedSec = session ? Math.floor((now - session.startedAt) / 1000) : 0
+  const elapsedSec = session ? sessionElapsedSec(session, now) : 0
   const targetSec = (session?.durationMin ?? parseNumeric(duration, 0)) * 60
   const promptAtSec = targetSec + PROMPT_GRACE_SEC
   const autoCompleteAtSec =
     session?.promptShownAt != null
-      ? Math.floor((session.promptShownAt - session.startedAt) / 1000) + AUTO_COMPLETE_AFTER_PROMPT_SEC
+      ? Math.floor((session.promptShownAt - session.startedAt - session.pausedMs) / 1000) +
+        AUTO_COMPLETE_AFTER_PROMPT_SEC
       : promptAtSec + AUTO_COMPLETE_AFTER_PROMPT_SEC
+
+  const isPaused = Boolean(session?.pausedAt)
+  const restLeftSec =
+    session?.restEndsAt != null
+      ? Math.max(0, Math.ceil((session.restEndsAt - (session.pausedAt ?? now)) / 1000))
+      : 0
+  const resting = restLeftSec > 0
+
+  const focusIndex = session?.focusIndex ?? 0
+  const allExercisesDone = selected.length > 0 && selected.every(isExerciseDone)
+  const lineProgress = targetSec > 0 ? Math.min(1, elapsedSec / targetSec) : 0
+
+  /** True while an incomplete exercise is actively being worked (not during rest). */
+  const hasActiveExercise = Boolean(
+    session &&
+      !resting &&
+      selected[focusIndex] &&
+      !isExerciseDone(selected[focusIndex]),
+  )
+
+  const displayExercise = useMemo(() => {
+    if (!session || selected.length === 0) return undefined
+    if (resting) return selected[focusIndex]
+    const fromFocus = selected.find((ex, i) => i >= focusIndex && !isExerciseDone(ex))
+    return fromFocus ?? selected.find((ex) => !isExerciseDone(ex))
+  }, [session, selected, focusIndex, resting])
+
+  const currentActivityLabel = useMemo(() => {
+    if (!session) return ''
+    if (allExercisesDone) return 'All exercises done — complete when ready'
+    if (resting && restLeftSec > 0) {
+      const next = selected[focusIndex] ?? displayExercise
+      return next ? `Rest · next up: ${next.exerciseName}` : 'Rest'
+    }
+    if (displayExercise) return displayExercise.exerciseName
+    return title
+  }, [
+    session,
+    allExercisesDone,
+    resting,
+    restLeftSec,
+    selected,
+    focusIndex,
+    displayExercise,
+    title,
+  ])
+
+  const displayExerciseNumber = useMemo(() => {
+    if (!displayExercise) return 0
+    const idx = selected.findIndex((ex) => ex.exerciseId === displayExercise.exerciseId)
+    return idx >= 0 ? idx + 1 : focusIndex + 1
+  }, [displayExercise, selected, focusIndex])
+
+  useEffect(() => {
+    if (!session?.restEndsAt || session.pausedAt) return
+    if (now >= session.restEndsAt) {
+      setSession((prev) => (prev ? { ...prev, restEndsAt: null } : prev))
+    }
+  }, [session?.restEndsAt, session?.pausedAt, now])
+
+  useEffect(() => {
+    if (!session) return
+    const el = exerciseRefs.current[focusIndex]
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [session, focusIndex, resting])
 
   const persistWorkout = useCallback(async () => {
     if (!user?.id || completingRef.current) return
@@ -312,9 +380,8 @@ export function LogWorkoutPage() {
     }
   }, [user?.id, session, duration, date, title, notes, selected, elapsedSec, navigate])
 
-  // Prompt / auto-complete timers
   useEffect(() => {
-    if (!session || completingRef.current) return
+    if (!session || completingRef.current || isPaused) return
 
     if (elapsedSec >= promptAtSec && !session.promptShownAt) {
       const promptShownAt = Date.now()
@@ -323,14 +390,10 @@ export function LogWorkoutPage() {
       return
     }
 
-    if (
-      session.promptShownAt &&
-      elapsedSec >= autoCompleteAtSec &&
-      !completingRef.current
-    ) {
+    if (session.promptShownAt && elapsedSec >= autoCompleteAtSec && !completingRef.current) {
       void persistWorkout()
     }
-  }, [session, elapsedSec, promptAtSec, autoCompleteAtSec, persistWorkout])
+  }, [session, elapsedSec, promptAtSec, autoCompleteAtSec, persistWorkout, isPaused])
 
   function clearFieldError(key: keyof FieldErrors) {
     setFieldErrors((prev) => {
@@ -363,7 +426,6 @@ export function LogWorkoutPage() {
   function addExercise(ex: Exercise) {
     if (alreadyLogged || !ex.id) return
     if (selected.some((s) => s.exerciseId === ex.id)) return
-    // Newest on top
     setSelected((prev) => [toWorkoutExercise(ex, units), ...prev])
     clearFieldError('exercises')
     clearFieldError('sets')
@@ -415,7 +477,7 @@ export function LogWorkoutPage() {
   }
 
   function startRest() {
-    if (alreadyLogged) return
+    if (alreadyLogged || session) return
     setRestLeft(restSeconds)
     const tick = window.setInterval(() => {
       setRestLeft((v) => {
@@ -426,6 +488,83 @@ export function LogWorkoutPage() {
         return v - 1
       })
     }, 1000)
+  }
+
+  function togglePause() {
+    if (!session) return
+    const t = Date.now()
+    if (session.pausedAt) {
+      const pauseDuration = t - session.pausedAt
+      setSession({
+        ...session,
+        pausedAt: null,
+        pausedMs: session.pausedMs + pauseDuration,
+        restEndsAt: session.restEndsAt != null ? session.restEndsAt + pauseDuration : null,
+      })
+    } else {
+      setSession({ ...session, pausedAt: t })
+    }
+  }
+
+  const advanceFocusFrom = useCallback(
+    (doneIdx: number) => {
+      setSession((prev) => {
+        if (!prev) return prev
+        const nextIndex = selected.findIndex((ex, i) => i > doneIdx && !isExerciseDone(ex))
+        if (nextIndex >= 0) {
+          return {
+            ...prev,
+            focusIndex: nextIndex,
+            restEndsAt: Date.now() + BETWEEN_EXERCISE_REST_SEC * 1000,
+          }
+        }
+        if (prev.focusIndex === doneIdx && prev.restEndsAt == null) return prev
+        return { ...prev, focusIndex: doneIdx, restEndsAt: null }
+      })
+    },
+    [selected],
+  )
+
+  // If the focused exercise becomes done (e.g. all sets ticked), move focus to the next
+  useEffect(() => {
+    if (!session || resting || isPaused) return
+    const focused = selected[session.focusIndex]
+    if (!focused || !isExerciseDone(focused)) return
+    const hasNext = selected.some((ex, i) => i > session.focusIndex && !isExerciseDone(ex))
+    if (!hasNext) return
+    advanceFocusFrom(session.focusIndex)
+  }, [selected, session, resting, isPaused, advanceFocusFrom])
+
+  function markExerciseDone(exIdx: number) {
+    if (!session || resting || isPaused) return
+    if (exIdx !== session.focusIndex) return
+
+    if (!isExerciseDone(selected[exIdx])) {
+      setSelected((prev) =>
+        prev.map((ex, i) =>
+          i === exIdx
+            ? { ...ex, sets: ex.sets.map((s) => ({ ...s, completed: true })) }
+            : ex,
+        ),
+      )
+    }
+    advanceFocusFrom(exIdx)
+  }
+
+  /** Pick an exercise as the current / next one when nothing is actively in progress. */
+  function setAsCurrent(exIdx: number) {
+    if (!session || hasActiveExercise || isPaused) return
+    if (isExerciseDone(selected[exIdx])) return
+    setSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            focusIndex: exIdx,
+            // Keep mandatory rest if it's already running; otherwise start this exercise now
+            restEndsAt: resting && prev.restEndsAt ? prev.restEndsAt : null,
+          }
+        : prev,
+    )
   }
 
   async function onSaveToPlan(e?: FormEvent) {
@@ -439,7 +578,6 @@ export function LogWorkoutPage() {
       selected,
       requireSets: false,
     })
-    // Duration not required just to save plan — drop that error
     delete errors.duration
     setFieldErrors(errors)
     if (errors.title || errors.date || errors.exercises) {
@@ -524,6 +662,10 @@ export function LogWorkoutPage() {
       date,
       notes: notes.trim(),
       exercises: selected,
+      focusIndex: 0,
+      restEndsAt: null,
+      pausedAt: null,
+      pausedMs: 0,
       promptShownAt: null,
       promptDismissed: false,
     }
@@ -562,9 +704,6 @@ export function LogWorkoutPage() {
     'cardio',
     'full',
   ]
-
-  const ringProgress = targetSec > 0 ? Math.min(1, elapsedSec / targetSec) : 0
-  const overtime = elapsedSec > targetSec
 
   if (alreadyLogged && existingForDate) {
     return (
@@ -610,20 +749,6 @@ export function LogWorkoutPage() {
             )}
           </div>
         </section>
-
-        <section className="glass animate-fade-up rounded-[var(--radius)] p-4">
-          <label className="label" htmlFor="other-date">
-            Log a different day?
-          </label>
-          <input
-            id="other-date"
-            className="input input-date-compact"
-            type="date"
-            max={today}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </section>
       </div>
     )
   }
@@ -632,42 +757,87 @@ export function LogWorkoutPage() {
     <div className="space-y-5">
       <header className="animate-fade-up">
         <h1 className="font-display text-3xl font-extrabold">
-          {session ? 'Workout in progress' : 'Log workout'}
+          {session ? title : 'Log workout'}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           {session
-            ? 'Finish manually anytime — we’ll nudge you after your set time.'
+            ? 'Mark each exercise done — 1 min rest between them.'
             : 'Build a session, save it to your plan, or start the timer.'}
         </p>
       </header>
 
       {session && (
-        <section className="glass animate-fade-up flex flex-col items-center rounded-[var(--radius)] p-5">
-          <ProgressRing
-            value={overtime ? 1 : ringProgress}
-            size={160}
-            stroke={12}
-            label={formatClock(elapsedSec)}
-            sublabel={
-              overtime
-                ? `+${formatClock(elapsedSec - targetSec)} over`
-                : `${formatClock(Math.max(0, targetSec - elapsedSec))} left`
-            }
-          />
-          <p className="mt-3 text-sm text-[var(--ink-muted)]">
-            Target {session.durationMin} min
-            {session.promptShownAt
-              ? ' · awaiting confirmation to wrap up'
-              : ''}
-          </p>
-          <button
-            type="button"
-            className="btn btn-primary mt-4 w-full max-w-xs"
-            onClick={() => void onCompleteManual()}
-            disabled={busy}
-          >
-            {busy ? 'Saving…' : 'Complete workout'}
-          </button>
+        <section className="glass animate-fade-up sticky top-0 z-20 rounded-[var(--radius)] p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
+              <Timer size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="font-display text-2xl font-extrabold tabular-nums tracking-tight">
+                  {formatClock(elapsedSec)}
+                </span>
+                <span className="text-xs font-semibold text-[var(--ink-muted)]">
+                  / {session.durationMin}m
+                  {isPaused ? ' · paused' : ''}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--line)]">
+                <div
+                  className="h-full rounded-full bg-[var(--brand)] transition-[width] duration-500"
+                  style={{ width: `${lineProgress * 100}%` }}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary shrink-0 px-3 py-2"
+              onClick={togglePause}
+              aria-label={isPaused ? 'Resume' : 'Pause'}
+            >
+              {isPaused ? <Play size={16} /> : <Pause size={16} />}
+            </button>
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5">
+            {resting && restLeftSec > 0 ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--accent)]">
+                    Mandatory rest
+                  </p>
+                  <p className="truncate text-sm font-bold">{currentActivityLabel}</p>
+                </div>
+                <span className="shrink-0 font-display text-xl font-extrabold tabular-nums text-[var(--accent)]">
+                  {formatClock(restLeftSec)}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                  {allExercisesDone ? 'Status' : 'Now doing'}
+                </p>
+                <p className="truncate font-bold">{currentActivityLabel}</p>
+                {!allExercisesDone && displayExercise && !resting && (
+                  <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                    Exercise {displayExerciseNumber} of {selected.length} ·{' '}
+                    {MUSCLE_LABELS[displayExercise.muscle]}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {(allExercisesDone || elapsedSec >= targetSec) && (
+            <button
+              type="button"
+              className="btn btn-primary mt-3 w-full"
+              onClick={() => void onCompleteManual()}
+              disabled={busy}
+            >
+              {busy ? 'Saving…' : 'Complete workout'}
+            </button>
+          )}
         </section>
       )}
 
@@ -680,77 +850,70 @@ export function LogWorkoutPage() {
         className="space-y-4"
         noValidate
       >
-        <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
-          <div>
-            <label className="label" htmlFor="title">Title</label>
-            <input
-              id="title"
-              className={`input ${fieldErrors.title ? 'border-[var(--danger)]' : ''}`}
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value)
-                clearFieldError('title')
-              }}
-              disabled={Boolean(session)}
-              required
-            />
-            {fieldErrors.title && (
-              <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.title}</p>
-            )}
-          </div>
-          <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2 sm:grid-cols-2 sm:gap-3">
-            <div className="min-w-0">
-              <label className="label" htmlFor="date">Date</label>
+        {!session && (
+          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
+            <div>
+              <label className="label" htmlFor="title">Title</label>
               <input
-                id="date"
-                className={`input input-date-compact ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
-                type="date"
-                max={today}
-                value={date}
+                id="title"
+                className={`input ${fieldErrors.title ? 'border-[var(--danger)]' : ''}`}
+                value={title}
                 onChange={(e) => {
-                  setDate(e.target.value)
-                  clearFieldError('date')
-                  setError('')
+                  setTitle(e.target.value)
+                  clearFieldError('title')
                 }}
-                disabled={Boolean(session)}
                 required
               />
-              {fieldErrors.date && (
-                <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.date}</p>
+              {fieldErrors.title && (
+                <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.title}</p>
               )}
             </div>
-            <div className="min-w-0">
-              <label className="label" htmlFor="duration">Minutes</label>
+            <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2 sm:grid-cols-2 sm:gap-3">
+              <div className="min-w-0">
+                <label className="label" htmlFor="date">Date</label>
+                <input
+                  id="date"
+                  className={`input input-date-compact ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
+                  type="date"
+                  max={today}
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value)
+                    clearFieldError('date')
+                    setError('')
+                  }}
+                  required
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="label" htmlFor="duration">Minutes</label>
+                <input
+                  id="duration"
+                  className={`input ${fieldErrors.duration ? 'border-[var(--danger)]' : ''}`}
+                  type="text"
+                  inputMode="numeric"
+                  value={duration}
+                  onChange={(e) => {
+                    setDuration(sanitizeNumericInput(e.target.value))
+                    clearFieldError('duration')
+                  }}
+                  onBlur={() => setDuration(toNumericString(duration, defaultDuration))}
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label" htmlFor="notes">Notes</label>
               <input
-                id="duration"
-                className={`input ${fieldErrors.duration ? 'border-[var(--danger)]' : ''}`}
-                type="text"
-                inputMode="numeric"
-                value={duration}
-                onChange={(e) => {
-                  setDuration(sanitizeNumericInput(e.target.value))
-                  clearFieldError('duration')
-                }}
-                onBlur={() => setDuration(toNumericString(duration, defaultDuration))}
-                disabled={Boolean(session)}
-                required
+                id="notes"
+                className="input"
+                placeholder="Felt strong, shorter rest…"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
               />
-              {fieldErrors.duration && (
-                <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.duration}</p>
-              )}
             </div>
-          </div>
-          <div>
-            <label className="label" htmlFor="notes">Notes</label>
-            <input
-              id="notes"
-              className="input"
-              placeholder="Felt strong, shorter rest…"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-        </section>
+          </section>
+        )}
 
         {!session && (
           <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
@@ -758,9 +921,6 @@ export function LogWorkoutPage() {
               <Sparkles size={16} className="text-[var(--brand)]" />
               <h2 className="font-display text-base font-bold">Presets</h2>
             </div>
-            <p className="text-xs text-[var(--ink-muted)]">
-              Based on your plan day and workout type. Apply, then edit freely.
-            </p>
             <div className="flex flex-wrap gap-2">
               {planDay && planDay.muscles.length > 0 && (
                 <button
@@ -787,17 +947,17 @@ export function LogWorkoutPage() {
 
         <div className="flex items-center justify-between animate-fade-up">
           <h2 className="font-display text-xl font-bold">Exercises</h2>
-          <div className="flex gap-2">
-            {restLeft != null ? (
-              <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-extrabold text-[var(--accent)]">
-                Rest {restLeft}s
-              </span>
-            ) : (
-              <button type="button" className="btn btn-secondary px-3 py-1.5 text-sm" onClick={startRest}>
-                Rest timer
-              </button>
-            )}
-            {!session && (
+          {!session && (
+            <div className="flex gap-2">
+              {restLeft != null ? (
+                <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-extrabold text-[var(--accent)]">
+                  Rest {restLeft}s
+                </span>
+              ) : (
+                <button type="button" className="btn btn-secondary px-3 py-1.5 text-sm" onClick={startRest}>
+                  Rest timer
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-accent px-3 py-1.5 text-sm"
@@ -805,8 +965,8 @@ export function LogWorkoutPage() {
               >
                 <Plus size={16} /> Add
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {fieldErrors.exercises && (
@@ -833,96 +993,179 @@ export function LogWorkoutPage() {
           </button>
         )}
 
-        {selected.map((ex, exIdx) => (
-          <section
-            key={`${ex.exerciseId}-${exIdx}`}
-            className="glass animate-slide-in rounded-[var(--radius)] p-4"
-            style={{ animationDelay: `${exIdx * 40}ms` }}
-          >
-            <div className="flex items-start gap-3">
-              <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold">{ex.exerciseName}</p>
-                <p className="text-xs text-[var(--ink-muted)]">{MUSCLE_LABELS[ex.muscle]}</p>
-              </div>
-              {!session && (
-                <button
-                  type="button"
-                  className="btn btn-ghost p-2"
-                  onClick={() => removeExercise(exIdx)}
-                  aria-label="Remove"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
+        {selected.map((ex, exIdx) => {
+          const done = isExerciseDone(ex)
+          const isFocus = Boolean(session) && focusIndex === exIdx && !done && !resting
+          const isNextUp = Boolean(session) && resting && focusIndex === exIdx && !done
+          const isLocked =
+            Boolean(session) && (resting || isPaused || (exIdx !== focusIndex && !done))
+          const dimmed = Boolean(session) && !isFocus && !isNextUp && !done
+          const canSetCurrent =
+            Boolean(session) && !done && !isFocus && !isNextUp && !hasActiveExercise && !isPaused
 
-            <div className="mt-3 space-y-2">
-              <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 px-1 text-[0.65rem] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
-                <span>#</span>
-                <span>Reps</span>
-                <span>Weight ({units})</span>
-                <span />
-              </div>
-              {ex.sets.map((set, setIdx) => (
-                <div key={setIdx} className="grid grid-cols-[2rem_1fr_1fr_2.5rem] items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateSet(exIdx, setIdx, { completed: !set.completed })
-                      if (!set.completed) startRest()
-                    }}
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
-                      set.completed
-                        ? 'bg-[var(--brand)] text-white'
-                        : 'bg-white border border-[var(--line)]'
-                    }`}
-                  >
-                    {set.completed ? <Check size={14} /> : setIdx + 1}
-                  </button>
-                  <input
-                    className={`input py-2 ${set.reps <= 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
-                    type="text"
-                    inputMode="numeric"
-                    value={toNumericString(set.reps, '0')}
-                    onChange={(e) =>
-                      updateSet(exIdx, setIdx, {
-                        reps: parseNumeric(sanitizeNumericInput(e.target.value), 0),
-                      })
-                    }
-                  />
-                  <input
-                    className={`input py-2 ${set.weight < 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
-                    type="text"
-                    inputMode="decimal"
-                    value={toNumericString(set.weight, '0')}
-                    onChange={(e) =>
-                      updateSet(exIdx, setIdx, {
-                        weight: parseNumeric(sanitizeNumericInput(e.target.value, true), 0),
-                      })
-                    }
-                  />
+          return (
+            <section
+              key={`${ex.exerciseId}-${exIdx}`}
+              ref={(node) => {
+                exerciseRefs.current[exIdx] = node
+              }}
+              className={`animate-slide-in rounded-[var(--radius)] p-4 transition ${
+                isFocus || isNextUp
+                  ? 'glass ring-2 ring-[var(--brand)] shadow-[0_8px_28px_rgba(15,118,110,0.18)]'
+                  : done
+                    ? 'glass opacity-70'
+                    : dimmed
+                      ? 'glass opacity-50'
+                      : 'glass'
+              }`}
+              style={{ animationDelay: `${exIdx * 40}ms` }}
+            >
+              <div className="flex items-start gap-3">
+                <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-bold">{ex.exerciseName}</p>
+                    {done && (
+                      <span className="shrink-0 rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--brand)]">
+                        Done
+                      </span>
+                    )}
+                    {isFocus && !resting && (
+                      <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--accent)]">
+                        Active
+                      </span>
+                    )}
+                    {isNextUp && (
+                      <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--accent)]">
+                        Next
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--ink-muted)]">{MUSCLE_LABELS[ex.muscle]}</p>
+                </div>
+                {!session && (
                   <button
                     type="button"
                     className="btn btn-ghost p-2"
-                    onClick={() => removeSet(exIdx, setIdx)}
-                    aria-label="Remove set"
-                    disabled={ex.sets.length <= 1}
+                    onClick={() => removeExercise(exIdx)}
+                    aria-label="Remove"
                   >
-                    <Minus size={14} />
+                    <Trash2 size={16} />
                   </button>
+                )}
+              </div>
+
+              {(!session || isFocus || isNextUp || done) && (
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 px-1 text-[0.65rem] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <span>#</span>
+                    <span>Reps</span>
+                    <span>Weight ({units})</span>
+                    <span />
+                  </div>
+                  {ex.sets.map((set, setIdx) => (
+                    <div key={setIdx} className="grid grid-cols-[2rem_1fr_1fr_2.5rem] items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(session) && (resting || isPaused || !isFocus)}
+                        onClick={() => {
+                          updateSet(exIdx, setIdx, { completed: !set.completed })
+                          if (!session && !set.completed) startRest()
+                        }}
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
+                          set.completed
+                            ? 'bg-[var(--brand)] text-white'
+                            : 'bg-white border border-[var(--line)]'
+                        }`}
+                      >
+                        {set.completed ? <Check size={14} /> : setIdx + 1}
+                      </button>
+                      <input
+                        className={`input py-2 ${set.reps <= 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
+                        type="text"
+                        inputMode="numeric"
+                        value={toNumericString(set.reps, '0')}
+                        disabled={Boolean(session) && !isFocus}
+                        onChange={(e) =>
+                          updateSet(exIdx, setIdx, {
+                            reps: parseNumeric(sanitizeNumericInput(e.target.value), 0),
+                          })
+                        }
+                      />
+                      <input
+                        className={`input py-2 ${set.weight < 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
+                        type="text"
+                        inputMode="decimal"
+                        value={toNumericString(set.weight, '0')}
+                        disabled={Boolean(session) && !isFocus}
+                        onChange={(e) =>
+                          updateSet(exIdx, setIdx, {
+                            weight: parseNumeric(sanitizeNumericInput(e.target.value, true), 0),
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost p-2"
+                        onClick={() => removeSet(exIdx, setIdx)}
+                        aria-label="Remove set"
+                        disabled={ex.sets.length <= 1 || (Boolean(session) && !isFocus)}
+                      >
+                        <Minus size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="btn btn-secondary mt-3 w-full py-2 text-sm"
-              onClick={() => addSet(exIdx)}
-            >
-              <Plus size={14} /> Add set
-            </button>
-          </section>
-        ))}
+              )}
+
+              {!session && (
+                <button
+                  type="button"
+                  className="btn btn-secondary mt-3 w-full py-2 text-sm"
+                  onClick={() => addSet(exIdx)}
+                >
+                  <Plus size={14} /> Add set
+                </button>
+              )}
+
+              {session && isFocus && !done && (
+                <button
+                  type="button"
+                  className="btn btn-primary mt-3 w-full"
+                  disabled={isLocked}
+                  onClick={() => markExerciseDone(exIdx)}
+                >
+                  <Check size={16} />
+                  {isPaused ? 'Resume timer to continue' : 'Mark exercise done'}
+                </button>
+              )}
+
+              {session && isNextUp && (
+                <p className="mt-3 text-center text-xs font-semibold text-[var(--accent)]">
+                  Rest {formatClock(restLeftSec)} — then this exercise starts
+                </p>
+              )}
+
+              {session && !done && !isFocus && !isNextUp && (
+                <button
+                  type="button"
+                  className="btn btn-secondary mt-3 w-full py-2 text-sm"
+                  disabled={!canSetCurrent}
+                  onClick={() => setAsCurrent(exIdx)}
+                  title={
+                    hasActiveExercise
+                      ? 'Finish or mark the active exercise done first'
+                      : isPaused
+                        ? 'Resume the timer first'
+                        : 'Make this the current exercise'
+                  }
+                >
+                  Set as current
+                </button>
+              )}
+            </section>
+          )
+        })}
 
         {error && (
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
@@ -949,7 +1192,18 @@ export function LogWorkoutPage() {
               <Play size={16} /> Start workout
             </button>
           </div>
-        ) : null}
+        ) : (
+          !allExercisesDone && (
+            <button
+              type="button"
+              className="btn btn-secondary w-full"
+              onClick={() => void onCompleteManual()}
+              disabled={busy}
+            >
+              {busy ? 'Saving…' : 'End & save early'}
+            </button>
+          )
+        )}
       </form>
 
       {pickerOpen && (
@@ -965,7 +1219,7 @@ export function LogWorkoutPage() {
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]" />
                 <input
-                  className="input pl-9"
+                  className="input input-with-icon"
                   placeholder="Search exercises"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -988,11 +1242,6 @@ export function LogWorkoutPage() {
                   </button>
                 ))}
               </div>
-              {recentExerciseIds.length > 0 && (
-                <p className="text-xs font-semibold text-[var(--ink-muted)]">
-                  Recent exercises are listed first
-                </p>
-              )}
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto px-4 pb-6">
               {filtered.map((ex) => (
@@ -1007,15 +1256,11 @@ export function LogWorkoutPage() {
                     <p className="font-bold">{ex.name}</p>
                     <p className="text-xs text-[var(--ink-muted)]">
                       {MUSCLE_LABELS[ex.muscle]} · {ex.equipment}
-                      {ex.id != null && recentExerciseIds.includes(ex.id) ? ' · Recent' : ''}
                     </p>
                   </div>
                   <ChevronDown className="-rotate-90 text-[var(--ink-muted)]" size={16} />
                 </button>
               ))}
-              {filtered.length === 0 && (
-                <p className="py-8 text-center text-sm text-[var(--ink-muted)]">No exercises found.</p>
-              )}
             </div>
           </div>
         </div>
@@ -1044,9 +1289,7 @@ export function LogWorkoutPage() {
                 className="btn btn-secondary w-full"
                 onClick={() => {
                   setShowCompletePrompt(false)
-                  setSession((prev) =>
-                    prev ? { ...prev, promptDismissed: true } : prev,
-                  )
+                  setSession((prev) => (prev ? { ...prev, promptDismissed: true } : prev))
                 }}
               >
                 Not yet — keep going
