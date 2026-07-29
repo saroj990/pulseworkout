@@ -112,7 +112,6 @@ export function SettingsPage() {
       <section className="glass animate-fade-up rounded-[var(--radius)] p-4">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Signed in</p>
         <p className="mt-1 font-display text-xl font-bold">{user?.name}</p>
-        <p className="text-sm text-[var(--ink-muted)]">{user?.email}</p>
         <button type="button" className="btn btn-secondary mt-4 w-full" onClick={logout}>
           <LogOut size={16} /> Sign out
         </button>

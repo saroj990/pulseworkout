@@ -29,7 +29,7 @@ Pulse is an offline-first daily workout PWA. Accounts, preferences, goals, plans
 ## Features
 
 ### Accounts & security
-- Local sign-up / sign-in (password hashed with salt; session in `localStorage`)
+- Local sign-up / sign-in with **name + 4-digit PIN** (hashed; session in `localStorage`)
 - Optional **4-digit PIN lock** — prompts whenever the app returns from the background
 - Sign out from the profile menu
 

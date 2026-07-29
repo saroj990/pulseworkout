@@ -13,10 +13,15 @@ export type MuscleGroup =
 
 export interface User {
   id?: number
-  email: string
+  /** Legacy field — unused for new accounts. */
+  email?: string
   name: string
-  passwordHash: string
-  salt: string
+  /** Account PIN (hashed). */
+  pinHash: string
+  pinSalt: string
+  /** @deprecated Legacy password fields — ignored for new sign-in. */
+  passwordHash?: string
+  salt?: string
   createdAt: string
 }
 
@@ -140,6 +145,16 @@ class WorkoutDB extends Dexie {
     })
     this.version(3).stores({
       users: '++id, email',
+      preferences: '++id, userId',
+      goals: '++id, userId',
+      exercises: '++id, muscle, name, userId',
+      workouts: '++id, userId, date, updatedAt',
+      syncMeta: '++id, userId',
+      userPlans: '++id, userId, active',
+      waterLogs: '++id, userId, date, createdAt',
+    })
+    this.version(4).stores({
+      users: '++id, email, name',
       preferences: '++id, userId',
       goals: '++id, userId',
       exercises: '++id, muscle, name, userId',

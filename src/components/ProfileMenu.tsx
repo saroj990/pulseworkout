@@ -3,8 +3,8 @@ import { FileSpreadsheet, LogOut, Trash2, UserRound } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { clearUserTrainingData, exportToCsv } from '../lib/dataActions'
 
-function initials(name?: string, email?: string) {
-  const source = (name || email || 'U').trim()
+function initials(name?: string) {
+  const source = (name || 'U').trim()
   const parts = source.split(/\s+/).filter(Boolean)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
   return source.slice(0, 2).toUpperCase()
@@ -89,7 +89,7 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
         aria-label="Profile menu"
       >
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand)] text-sm font-bold text-white">
-          {user ? initials(user.name, user.email) : <UserRound size={16} />}
+          {user ? initials(user.name) : <UserRound size={16} />}
         </span>
         {!compact && (
           <span className="hidden text-left sm:block">
@@ -108,7 +108,7 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
         >
           <div className="border-b border-[var(--line)] px-4 py-3">
             <p className="truncate font-bold">{user?.name}</p>
-            <p className="truncate text-xs text-[var(--ink-muted)]">{user?.email}</p>
+            <p className="truncate text-xs text-[var(--ink-muted)]">Signed in on this device</p>
           </div>
 
           <div className="p-2">

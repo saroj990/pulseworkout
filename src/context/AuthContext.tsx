@@ -11,13 +11,12 @@ import { db, type Goals, type Preferences, type User } from '../db'
 import { SEED_EXERCISES } from '../data/exercises'
 import { EXTRA_EXERCISES } from '../data/plans'
 import {
-  createSalt,
   getSessionUserId,
-  hashPassword,
   setSessionUserId,
 } from '../lib/auth'
 import { getOldDataSummary, type OldDataSummary } from '../lib/storageAlert'
-import { notifyAuthenticated } from '../lib/pin'
+import { createPinCredentials, notifyAuthenticated, verifyPin } from '../lib/pin'
+import { normalizeUsername, usernameKey } from '../lib/authValidation'
 
 interface AuthContextValue {
   user: User | null
@@ -26,8 +25,8 @@ interface AuthContextValue {
   loading: boolean
   storageAlert: OldDataSummary | null
   clearStorageAlert: () => void
-  login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
+  login: (name: string, pin: string) => Promise<void>
+  register: (name: string, pin: string) => Promise<void>
   logout: () => void
   refreshProfile: () => Promise<void>
   updatePreferences: (patch: Partial<Preferences>) => Promise<void>
@@ -92,19 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadUser])
 
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
-      const normalized = email.trim().toLowerCase()
-      const existing = await db.users.where('email').equals(normalized).first()
-      if (existing) throw new Error('An account with this email already exists.')
+    async (name: string, pin: string) => {
+      const displayName = normalizeUsername(name)
+      const key = usernameKey(displayName)
+      const all = await db.users.toArray()
+      const existing = all.find((u) => usernameKey(u.name) === key)
+      if (existing) throw new Error('That name is already taken on this device.')
 
-      const salt = createSalt()
-      const passwordHash = await hashPassword(password, salt)
+      const creds = await createPinCredentials(pin)
       const id = Number(
         await db.users.add({
-          email: normalized,
-          name: name.trim(),
-          passwordHash,
-          salt,
+          name: displayName,
+          pinHash: creds.pinHash,
+          pinSalt: creds.pinSalt,
           createdAt: new Date().toISOString(),
         }),
       )
@@ -145,12 +144,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const normalized = email.trim().toLowerCase()
-      const u = await db.users.where('email').equals(normalized).first()
-      if (!u) throw new Error('Invalid email or password.')
-      const hash = await hashPassword(password, u.salt)
-      if (hash !== u.passwordHash) throw new Error('Invalid email or password.')
+    async (name: string, pin: string) => {
+      const key = usernameKey(name)
+      const all = await db.users.toArray()
+      const u = all.find((user) => usernameKey(user.name) === key)
+      if (!u?.pinHash || !u.pinSalt) {
+        throw new Error('Invalid name or PIN. If this is an older account, create a new one with a PIN.')
+      }
+      const ok = await verifyPin(pin, u.pinHash, u.pinSalt)
+      if (!ok) throw new Error('Invalid name or PIN.')
 
       const summary = await getOldDataSummary(u.id!)
       setStorageAlert(summary.hasOldData ? summary : null)

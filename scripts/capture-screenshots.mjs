@@ -13,8 +13,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const outDir = path.join(__dirname, '..', 'docs', 'screenshots')
 const base = 'http://127.0.0.1:5173'
-const email = `pulse-demo-${Date.now()}@example.com`
-const password = 'PulseDemo123!'
+const pin = '1234'
 
 async function shot(page, name) {
   const file = path.join(outDir, `${name}.png`)
@@ -38,8 +37,7 @@ async function main() {
   // Register
   await page.goto(`${base}/register`, { waitUntil: 'networkidle' })
   await page.locator('#name').fill('Alex Trainer')
-  await page.locator('#email').fill(email)
-  await page.locator('#password').fill(password)
+  await page.locator('#pin').fill(pin)
   await page.getByRole('button', { name: /get started/i }).click()
   await page.waitForURL(/onboarding/, { timeout: 15000 })
   await page.waitForTimeout(500)

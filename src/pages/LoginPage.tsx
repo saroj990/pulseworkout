@@ -1,22 +1,45 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import {
+  sanitizePinInput,
+  validateLoginInput,
+  type AuthFieldErrors,
+} from '../lib/authValidation'
+import { PIN_LENGTH } from '../lib/pin'
 
 export function LoginPage() {
   const { user, loading, login } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({})
   const [busy, setBusy] = useState(false)
 
   if (!loading && user) return <Navigate to="/" replace />
 
+  function clearFieldError(key: keyof AuthFieldErrors) {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    const errors = validateLoginInput(name, pin)
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      setError('Please fix the highlighted fields.')
+      return
+    }
+
     setError('')
     setBusy(true)
     try {
-      await login(email, password)
+      await login(name, pin)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -64,33 +87,47 @@ export function LoginPage() {
 
           <form
             onSubmit={onSubmit}
+            noValidate
             className="glass mt-8 space-y-4 rounded-[var(--radius)] p-5 shadow-[var(--shadow)] animate-fade-up lg:mt-0"
             style={{ animationDelay: '80ms' }}
           >
             <div>
-              <label className="label" htmlFor="email">Email</label>
+              <label className="label" htmlFor="name">Name</label>
               <input
-                id="email"
-                className="input"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="name"
+                className={`input ${fieldErrors.name ? 'border-[var(--danger)]' : ''}`}
+                type="text"
+                autoComplete="username"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  clearFieldError('name')
+                  setError('')
+                }}
               />
+              {fieldErrors.name && (
+                <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.name}</p>
+              )}
             </div>
             <div>
-              <label className="label" htmlFor="password">Password</label>
+              <label className="label" htmlFor="pin">PIN</label>
               <input
-                id="password"
-                className="input"
+                id="pin"
+                className={`input tracking-[0.35em] ${fieldErrors.pin ? 'border-[var(--danger)]' : ''}`}
                 type="password"
-                autoComplete="current-password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={PIN_LENGTH}
+                value={pin}
+                onChange={(e) => {
+                  setPin(sanitizePinInput(e.target.value))
+                  clearFieldError('pin')
+                  setError('')
+                }}
               />
+              {fieldErrors.pin && (
+                <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.pin}</p>
+              )}
             </div>
             {error && (
               <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
