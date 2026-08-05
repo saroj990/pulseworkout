@@ -450,6 +450,8 @@ export function LogWorkoutPage() {
 
   function updateSet(exIdx: number, setIdx: number, patch: Partial<WorkoutSet>) {
     if (alreadyLogged) return
+    // Completing sets is only allowed after Start workout
+    if (patch.completed !== undefined && !session) return
     setSelected((prev) =>
       prev.map((ex, i) =>
         i !== exIdx
@@ -1134,21 +1136,40 @@ export function LogWorkoutPage() {
                     <span>Weight ({units})</span>
                     <span />
                   </div>
-                  {ex.sets.map((set, setIdx) => (
+                  {!session && (
+                    <p className="px-1 text-xs text-[var(--ink-muted)]">
+                      Edit reps and weight now — mark sets done after you start the workout.
+                    </p>
+                  )}
+                  {ex.sets.map((set, setIdx) => {
+                    const canCompleteSet =
+                      Boolean(session) && isFocus && !resting && !isPaused
+                    return (
                     <div key={setIdx} className="grid grid-cols-[2rem_1fr_1fr_2.5rem] items-center gap-2">
                       <button
                         type="button"
-                        disabled={Boolean(session) && (resting || isPaused || !isFocus)}
+                        disabled={!canCompleteSet}
+                        title={
+                          !session
+                            ? 'Start the workout to mark sets done'
+                            : !isFocus
+                              ? 'This exercise is not active'
+                              : resting
+                                ? 'Finish or skip rest first'
+                                : undefined
+                        }
                         onClick={() => {
+                          if (!canCompleteSet) return
                           const markingDone = !set.completed
                           updateSet(exIdx, setIdx, { completed: markingDone })
-                          // Between-set rest: always restart from 60s (or preference) when a set is completed
                           if (markingDone) startRest(BETWEEN_EXERCISE_REST_SEC)
                         }}
                         className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
                           set.completed
                             ? 'bg-[var(--brand)] text-white'
-                            : 'bg-white border border-[var(--line)]'
+                            : canCompleteSet
+                              ? 'bg-white border border-[var(--line)]'
+                              : 'bg-white/70 border border-[var(--line)] opacity-60'
                         }`}
                       >
                         {set.completed ? <Check size={14} /> : setIdx + 1}
@@ -1187,7 +1208,8 @@ export function LogWorkoutPage() {
                         <Minus size={14} />
                       </button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 
