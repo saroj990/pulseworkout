@@ -108,7 +108,10 @@ export function LogWorkoutPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const units = preferences?.units ?? 'kg'
-  const restSeconds = preferences?.restSeconds ?? 90
+  const restSeconds =
+    preferences?.restSeconds && preferences.restSeconds > 0
+      ? preferences.restSeconds
+      : BETWEEN_EXERCISE_REST_SEC
   const prefillsApplied = useRef(false)
   const completingRef = useRef(false)
   const exerciseRefs = useRef<Record<number, HTMLElement | null>>({})
@@ -192,11 +195,14 @@ export function LogWorkoutPage() {
     prefillsApplied.current = true
   }, [user?.id])
 
+  // Keep a stable tick while a session is open — don't reset the interval on every session field change
+  const sessionActive = Boolean(session)
   useEffect(() => {
-    if (!session) return
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    if (!sessionActive) return
+    setNow(Date.now())
+    const id = window.setInterval(() => setNow(Date.now()), 250)
     return () => window.clearInterval(id)
-  }, [session])
+  }, [sessionActive])
 
   useEffect(() => {
     if (!session) return
@@ -270,10 +276,12 @@ export function LogWorkoutPage() {
       : promptAtSec + AUTO_COMPLETE_AFTER_PROMPT_SEC
 
   const isPaused = Boolean(session?.pausedAt)
-  const restLeftSec =
-    session?.restEndsAt != null
-      ? Math.max(0, Math.ceil((session.restEndsAt - (session.pausedAt ?? now)) / 1000))
-      : 0
+  // Use live clock (and floor) so remaining time only counts down — never inflates from a stale `now`
+  const restLeftSec = useMemo(() => {
+    if (session?.restEndsAt == null) return 0
+    const reference = session.pausedAt ?? now
+    return Math.max(0, Math.floor((session.restEndsAt - reference) / 1000))
+  }, [session?.restEndsAt, session?.pausedAt, now])
   const resting = restLeftSec > 0
 
   const focusIndex = session?.focusIndex ?? 0
@@ -299,7 +307,13 @@ export function LogWorkoutPage() {
     if (!session) return ''
     if (allExercisesDone) return 'All exercises done — complete when ready'
     if (resting && restLeftSec > 0) {
-      const next = selected[focusIndex] ?? displayExercise
+      const focused = selected[focusIndex]
+      // Between exercises: next up is incomplete focused exercise after finishing the previous
+      // Between sets: focused exercise still has incomplete sets
+      if (focused && !isExerciseDone(focused)) {
+        return `Rest · ${focused.exerciseName}`
+      }
+      const next = focused ?? displayExercise
       return next ? `Rest · next up: ${next.exerciseName}` : 'Rest'
     }
     if (displayExercise) return displayExercise.exerciseName
@@ -486,22 +500,30 @@ export function LogWorkoutPage() {
     setRestLeft(null)
   }
 
-  function startRest() {
-    if (alreadyLogged || session) return
+  /** Start / restart a countdown that can only decrease (wall-clock based). */
+  function startRest(durationSec: number = restSeconds) {
+    if (alreadyLogged) return
+    const seconds = durationSec > 0 ? durationSec : BETWEEN_EXERCISE_REST_SEC
+
+    // During a live session, use session.restEndsAt (shared rest banner)
+    if (session) {
+      const endsAt = Date.now() + seconds * 1000
+      setSession((prev) => (prev ? { ...prev, restEndsAt: endsAt } : prev))
+      setNow(Date.now())
+      return
+    }
+
     clearStandaloneRest()
-    setRestLeft(restSeconds)
+    const endsAt = Date.now() + seconds * 1000
+    setRestLeft(seconds)
     restIntervalRef.current = window.setInterval(() => {
-      setRestLeft((v) => {
-        if (v == null || v <= 1) {
-          if (restIntervalRef.current != null) {
-            window.clearInterval(restIntervalRef.current)
-            restIntervalRef.current = null
-          }
-          return null
-        }
-        return v - 1
-      })
-    }, 1000)
+      const left = Math.max(0, Math.floor((endsAt - Date.now()) / 1000))
+      if (left <= 0) {
+        clearStandaloneRest()
+      } else {
+        setRestLeft(left)
+      }
+    }, 250)
   }
 
   function skipRest() {
@@ -521,10 +543,13 @@ export function LogWorkoutPage() {
         ...session,
         pausedAt: null,
         pausedMs: session.pausedMs + pauseDuration,
+        // Shift rest deadline by the paused duration so remaining time stays the same
         restEndsAt: session.restEndsAt != null ? session.restEndsAt + pauseDuration : null,
       })
+      setNow(t)
     } else {
       setSession({ ...session, pausedAt: t })
+      setNow(t)
     }
   }
 
@@ -534,15 +559,20 @@ export function LogWorkoutPage() {
         if (!prev) return prev
         const nextIndex = selected.findIndex((ex, i) => i > doneIdx && !isExerciseDone(ex))
         if (nextIndex >= 0) {
+          const alreadyResting = prev.restEndsAt != null && prev.restEndsAt > Date.now()
           return {
             ...prev,
             focusIndex: nextIndex,
-            restEndsAt: Date.now() + BETWEEN_EXERCISE_REST_SEC * 1000,
+            // Don't push the deadline forward if a rest is already running
+            restEndsAt: alreadyResting
+              ? prev.restEndsAt
+              : Date.now() + BETWEEN_EXERCISE_REST_SEC * 1000,
           }
         }
         if (prev.focusIndex === doneIdx && prev.restEndsAt == null) return prev
         return { ...prev, focusIndex: doneIdx, restEndsAt: null }
       })
+      setNow(Date.now())
     },
     [selected],
   )
@@ -555,7 +585,7 @@ export function LogWorkoutPage() {
     const hasNext = selected.some((ex, i) => i > session.focusIndex && !isExerciseDone(ex))
     if (!hasNext) return
     advanceFocusFrom(session.focusIndex)
-  }, [selected, session, resting, isPaused, advanceFocusFrom])
+  }, [selected, session?.focusIndex, resting, isPaused, advanceFocusFrom, session])
 
   function markExerciseDone(exIdx: number) {
     if (!session || resting || isPaused) return
@@ -989,7 +1019,7 @@ export function LogWorkoutPage() {
                   Rest {restLeft}s · Skip
                 </button>
               ) : (
-                <button type="button" className="btn btn-secondary px-3 py-1.5 text-sm" onClick={startRest}>
+                <button type="button" className="btn btn-secondary px-3 py-1.5 text-sm" onClick={() => startRest()}>
                   Rest timer
                 </button>
               )}
@@ -1031,7 +1061,13 @@ export function LogWorkoutPage() {
         {selected.map((ex, exIdx) => {
           const done = isExerciseDone(ex)
           const isFocus = Boolean(session) && focusIndex === exIdx && !done && !resting
-          const isNextUp = Boolean(session) && resting && focusIndex === exIdx && !done
+          // "Next" only when resting before an exercise that hasn't started any sets yet
+          const isNextUp =
+            Boolean(session) &&
+            resting &&
+            focusIndex === exIdx &&
+            !done &&
+            ex.sets.every((s) => !s.completed)
           const isLocked =
             Boolean(session) && (resting || isPaused || (exIdx !== focusIndex && !done))
           const dimmed = Boolean(session) && !isFocus && !isNextUp && !done
@@ -1104,8 +1140,10 @@ export function LogWorkoutPage() {
                         type="button"
                         disabled={Boolean(session) && (resting || isPaused || !isFocus)}
                         onClick={() => {
-                          updateSet(exIdx, setIdx, { completed: !set.completed })
-                          if (!session && !set.completed) startRest()
+                          const markingDone = !set.completed
+                          updateSet(exIdx, setIdx, { completed: markingDone })
+                          // Between-set rest: always restart from 60s (or preference) when a set is completed
+                          if (markingDone) startRest(BETWEEN_EXERCISE_REST_SEC)
                         }}
                         className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
                           set.completed

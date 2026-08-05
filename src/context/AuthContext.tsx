@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await db.preferences.add({
         userId: id,
         units: 'kg',
-        restSeconds: 90,
+        restSeconds: 60,
         weekStartsOn: 1,
         preferredMuscles: [],
         googleClientId: '',
