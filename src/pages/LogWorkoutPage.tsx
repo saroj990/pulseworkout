@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Search,
+  SkipForward,
   Sparkles,
   Timer,
   Trash2,
@@ -111,6 +112,7 @@ export function LogWorkoutPage() {
   const prefillsApplied = useRef(false)
   const completingRef = useRef(false)
   const exerciseRefs = useRef<Record<number, HTMLElement | null>>({})
+  const restIntervalRef = useRef<number | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const exercises = useLiveQuery(() => db.exercises.toArray(), [])
@@ -476,18 +478,38 @@ export function LogWorkoutPage() {
     setSelected((prev) => prev.filter((_, i) => i !== exIdx))
   }
 
+  function clearStandaloneRest() {
+    if (restIntervalRef.current != null) {
+      window.clearInterval(restIntervalRef.current)
+      restIntervalRef.current = null
+    }
+    setRestLeft(null)
+  }
+
   function startRest() {
     if (alreadyLogged || session) return
+    clearStandaloneRest()
     setRestLeft(restSeconds)
-    const tick = window.setInterval(() => {
+    restIntervalRef.current = window.setInterval(() => {
       setRestLeft((v) => {
         if (v == null || v <= 1) {
-          window.clearInterval(tick)
+          if (restIntervalRef.current != null) {
+            window.clearInterval(restIntervalRef.current)
+            restIntervalRef.current = null
+          }
           return null
         }
         return v - 1
       })
     }, 1000)
+  }
+
+  function skipRest() {
+    if (session?.restEndsAt != null) {
+      setSession((prev) => (prev ? { ...prev, restEndsAt: null } : prev))
+      return
+    }
+    clearStandaloneRest()
   }
 
   function togglePause() {
@@ -761,7 +783,7 @@ export function LogWorkoutPage() {
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           {session
-            ? 'Mark each exercise done — 1 min rest between them.'
+            ? 'Mark each exercise done — 1 min rest between them (skippable).'
             : 'Build a session, save it to your plan, or start the timer.'}
         </p>
       </header>
@@ -801,16 +823,25 @@ export function LogWorkoutPage() {
 
           <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5">
             {resting && restLeftSec > 0 ? (
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--accent)]">
-                    Mandatory rest
-                  </p>
-                  <p className="truncate text-sm font-bold">{currentActivityLabel}</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--accent)]">
+                      Rest
+                    </p>
+                    <p className="truncate text-sm font-bold">{currentActivityLabel}</p>
+                  </div>
+                  <span className="shrink-0 font-display text-xl font-extrabold tabular-nums text-[var(--accent)]">
+                    {formatClock(restLeftSec)}
+                  </span>
                 </div>
-                <span className="shrink-0 font-display text-xl font-extrabold tabular-nums text-[var(--accent)]">
-                  {formatClock(restLeftSec)}
-                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary w-full py-2 text-sm"
+                  onClick={skipRest}
+                >
+                  <SkipForward size={14} /> Skip rest
+                </button>
               </div>
             ) : (
               <div>
@@ -950,9 +981,13 @@ export function LogWorkoutPage() {
           {!session && (
             <div className="flex gap-2">
               {restLeft != null ? (
-                <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-extrabold text-[var(--accent)]">
-                  Rest {restLeft}s
-                </span>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-extrabold text-[var(--accent)]"
+                  onClick={skipRest}
+                >
+                  Rest {restLeft}s · Skip
+                </button>
               ) : (
                 <button type="button" className="btn btn-secondary px-3 py-1.5 text-sm" onClick={startRest}>
                   Rest timer
@@ -1141,9 +1176,18 @@ export function LogWorkoutPage() {
               )}
 
               {session && isNextUp && (
-                <p className="mt-3 text-center text-xs font-semibold text-[var(--accent)]">
-                  Rest {formatClock(restLeftSec)} — then this exercise starts
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-center text-xs font-semibold text-[var(--accent)]">
+                    Rest {formatClock(restLeftSec)} — then this exercise starts
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-secondary w-full py-2 text-sm"
+                    onClick={skipRest}
+                  >
+                    <SkipForward size={14} /> Skip rest
+                  </button>
+                </div>
               )}
 
               {session && !done && !isFocus && !isNextUp && (
