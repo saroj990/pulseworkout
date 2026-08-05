@@ -586,9 +586,7 @@ export function WorkoutDetailPage() {
                   {ex.sets.map((s, j) => (
                     <li
                       key={j}
-                      className={`grid grid-cols-[3rem_1fr_1fr_1fr] items-center gap-1 rounded-xl px-2 py-2 text-sm ${
-                        s.completed ? 'bg-[var(--brand-soft)]' : 'bg-white/70'
-                      }`}
+                      className={`grid grid-cols-[3rem_1fr_1fr_1fr] items-center gap-1 rounded-xl px-2 py-2 text-sm`}
                     >
                       <span className="font-extrabold text-[var(--ink-muted)]">{j + 1}</span>
                       <span className="font-bold">{s.reps}</span>
@@ -597,9 +595,11 @@ export function WorkoutDetailPage() {
                       </span>
                       <span className="text-right text-xs font-bold">
                         {s.completed ? (
-                          <span className="text-[var(--brand)]">Done</span>
+                          <span className="inline-block rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[var(--brand)]">
+                            Done
+                          </span>
                         ) : (
-                          <span className="text-[var(--ink-muted)]">Logged</span>
+                          <span className="text-[var(--accent)]">Not logged</span>
                         )}
                       </span>
                     </li>
