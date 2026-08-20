@@ -3,16 +3,31 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import type { MuscleGroup } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
-import { FOCUS_OPTIONS, normalizeFocus } from '../data/goals'
-import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
+import {
+  DEFAULT_DAILY_MINUTES,
+  DEFAULT_WEEKLY_WORKOUTS,
+  FOCUS_OPTIONS,
+  normalizeFocus,
+  positiveOrDefault,
+} from '../data/goals'
+import {
+  blurToPositiveDefault,
+  clearZeroOnFocus,
+  parseNumeric,
+  sanitizeNumericInput,
+} from '../lib/numeric'
 
 const OPTIONS: MuscleGroup[] = ['chest', 'back', 'shoulders', 'arms', 'legs', 'core', 'cardio', 'full']
 
 export function OnboardingPage() {
   const { user, preferences, goals, updatePreferences, updateGoals } = useAuth()
   const [units, setUnits] = useState<'kg' | 'lbs'>(preferences?.units ?? 'kg')
-  const [weekly, setWeekly] = useState(toNumericString(goals?.weeklyWorkouts, '0'))
-  const [minutes, setMinutes] = useState(toNumericString(goals?.dailyMinutes, '0'))
+  const [weekly, setWeekly] = useState(
+    String(positiveOrDefault(goals?.weeklyWorkouts, DEFAULT_WEEKLY_WORKOUTS)),
+  )
+  const [minutes, setMinutes] = useState(
+    String(positiveOrDefault(goals?.dailyMinutes, DEFAULT_DAILY_MINUTES)),
+  )
   const [focus, setFocus] = useState(normalizeFocus(goals?.focus))
   const [muscles, setMuscles] = useState<MuscleGroup[]>(preferences?.preferredMuscles ?? [])
   const [busy, setBusy] = useState(false)
@@ -28,14 +43,16 @@ export function OnboardingPage() {
     e.preventDefault()
     setBusy(true)
     try {
+      const weeklyN = positiveOrDefault(parseNumeric(weekly, 0), DEFAULT_WEEKLY_WORKOUTS)
+      const minutesN = positiveOrDefault(parseNumeric(minutes, 0), DEFAULT_DAILY_MINUTES)
       await updatePreferences({
         units,
         preferredMuscles: muscles,
         onboardingDone: true,
       })
       await updateGoals({
-        weeklyWorkouts: parseNumeric(weekly, 0),
-        dailyMinutes: parseNumeric(minutes, 0),
+        weeklyWorkouts: weeklyN,
+        dailyMinutes: minutesN,
         focus,
       })
     } finally {
@@ -82,7 +99,8 @@ export function OnboardingPage() {
               inputMode="numeric"
               value={weekly}
               onChange={(e) => setWeekly(sanitizeNumericInput(e.target.value))}
-              onBlur={() => setWeekly(toNumericString(weekly, '0'))}
+              onFocus={() => clearZeroOnFocus(weekly, setWeekly)}
+              onBlur={() => blurToPositiveDefault(weekly, setWeekly, DEFAULT_WEEKLY_WORKOUTS)}
             />
           </div>
           <div>
@@ -94,11 +112,12 @@ export function OnboardingPage() {
               inputMode="numeric"
               value={minutes}
               onChange={(e) => setMinutes(sanitizeNumericInput(e.target.value))}
-              onBlur={() => setMinutes(toNumericString(minutes, '0'))}
+              onFocus={() => clearZeroOnFocus(minutes, setMinutes)}
+              onBlur={() => blurToPositiveDefault(minutes, setMinutes, DEFAULT_DAILY_MINUTES)}
               aria-describedby="minutes-hint"
             />
             <p id="minutes-hint" className="mt-1.5 text-xs text-[var(--ink-muted)]">
-              In minutes — e.g. 45
+              In minutes — e.g. {DEFAULT_DAILY_MINUTES}
             </p>
           </div>
           <div>

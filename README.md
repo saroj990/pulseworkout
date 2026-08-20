@@ -83,6 +83,16 @@ Pulse is an offline-first daily workout PWA. Accounts, preferences, goals, plans
 - Optional Google Drive sync (`pulse-workouts.xlsx`)
 - CSV export of training data
 
+## Exercise icons (optional SVGs)
+
+Exercises use an `imageKey` (see `src/data/exercises.ts`). To customize art:
+
+1. Add `src/assets/exercises/{imageKey}.svg` (e.g. `bench-press.svg`)
+2. Restart / rebuild — Vite picks it up automatically
+3. If no file exists, the built-in line icon is used
+
+See `src/assets/exercises/README.md`.
+
 ## Tech stack
 
 - Vite + React + TypeScript

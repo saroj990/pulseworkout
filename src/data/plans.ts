@@ -244,7 +244,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'chest',
     equipment: 'Dumbbells',
     description: 'Press on an incline bench for upper chest emphasis.',
-    imageKey: 'bench-press',
+    imageKey: 'incline-press',
     isCustom: false,
   },
   {
@@ -252,7 +252,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'chest',
     equipment: 'Cable',
     description: 'Sweep cables together in front of your chest.',
-    imageKey: 'fly',
+    imageKey: 'cable-crossover',
     isCustom: false,
   },
   {
@@ -260,7 +260,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'back',
     equipment: 'Cable',
     description: 'Pull the handle to your torso, squeeze shoulder blades.',
-    imageKey: 'row',
+    imageKey: 'seated-row',
     isCustom: false,
   },
   {
@@ -268,7 +268,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'back',
     equipment: 'Cable',
     description: 'Pull toward your face with elbows high — great for rear delts.',
-    imageKey: 'pulldown',
+    imageKey: 'face-pull',
     isCustom: false,
   },
   {
@@ -276,7 +276,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'shoulders',
     equipment: 'Dumbbells',
     description: 'Rotate palms as you press overhead.',
-    imageKey: 'ohp',
+    imageKey: 'arnold-press',
     isCustom: false,
   },
   {
@@ -284,7 +284,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'shoulders',
     equipment: 'Dumbbells',
     description: 'Hinge forward and raise arms out to the sides.',
-    imageKey: 'lateral',
+    imageKey: 'rear-delt',
     isCustom: false,
   },
   {
@@ -292,7 +292,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'arms',
     equipment: 'Dumbbells',
     description: 'Curl with a neutral grip for brachialis and forearms.',
-    imageKey: 'curl',
+    imageKey: 'hammer-curl',
     isCustom: false,
   },
   {
@@ -300,7 +300,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'arms',
     equipment: 'Barbell',
     description: 'Lower the bar toward your forehead, then extend.',
-    imageKey: 'pushdown',
+    imageKey: 'skull-crusher',
     isCustom: false,
   },
   {
@@ -308,7 +308,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'arms',
     equipment: 'Cable',
     description: 'Curl with constant cable tension.',
-    imageKey: 'curl',
+    imageKey: 'cable-curl',
     isCustom: false,
   },
   {
@@ -316,7 +316,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'legs',
     equipment: 'Machine',
     description: 'Curl heels toward glutes, control the eccentric.',
-    imageKey: 'leg-press',
+    imageKey: 'leg-curl',
     isCustom: false,
   },
   {
@@ -324,7 +324,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'core',
     equipment: 'Cable',
     description: 'Kneel and crunch the cable down with abs, not arms.',
-    imageKey: 'twist',
+    imageKey: 'cable-crunch',
     isCustom: false,
   },
   {
@@ -332,7 +332,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'core',
     equipment: 'Bodyweight',
     description: 'Extend opposite arm and leg while keeping low back flat.',
-    imageKey: 'plank',
+    imageKey: 'dead-bug',
     isCustom: false,
   },
   {
@@ -340,7 +340,7 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     muscle: 'cardio',
     equipment: 'Machine',
     description: 'Drive with legs, then lean and pull. Smooth strokes.',
-    imageKey: 'row',
+    imageKey: 'rower',
     isCustom: false,
   },
 ]

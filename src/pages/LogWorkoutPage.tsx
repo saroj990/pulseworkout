@@ -23,6 +23,7 @@ import { MUSCLE_LABELS } from '../data/exercises'
 import { getExerciseDefault } from '../data/exerciseDefaults'
 import { ExerciseImage } from '../components/ExerciseImage'
 import { PART_WORKOUTS, WEEKDAY_FULL, getPlanDayForDate, type Weekday } from '../data/plans'
+import { DEFAULT_DAILY_MINUTES, positiveOrDefault } from '../data/goals'
 import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
 import {
   AUTO_COMPLETE_AFTER_PROMPT_SEC,
@@ -130,7 +131,7 @@ export function LogWorkoutPage() {
     return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 40)
   }, [user?.id])
 
-  const defaultDuration = String(goals?.dailyMinutes && goals.dailyMinutes > 0 ? goals.dailyMinutes : 45)
+  const defaultDuration = String(positiveOrDefault(goals?.dailyMinutes, DEFAULT_DAILY_MINUTES))
 
   const [title, setTitle] = useState(`Workout — ${format(new Date(), 'MMM d')}`)
   const [date, setDate] = useState(today)

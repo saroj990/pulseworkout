@@ -2,16 +2,33 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import type { MuscleGroup } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
-import { FOCUS_OPTIONS, normalizeFocus } from '../data/goals'
-import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
+import {
+  DEFAULT_DAILY_MINUTES,
+  DEFAULT_REST_SECONDS,
+  DEFAULT_WEEKLY_WORKOUTS,
+  FOCUS_OPTIONS,
+  normalizeFocus,
+  positiveOrDefault,
+} from '../data/goals'
+import {
+  blurToPositiveDefault,
+  clearZeroOnFocus,
+  parseNumeric,
+  sanitizeNumericInput,
+  toNumericString,
+} from '../lib/numeric'
 import { DEFAULT_WATER_GOAL_ML } from '../lib/water'
 
 const OPTIONS: MuscleGroup[] = ['chest', 'back', 'shoulders', 'arms', 'legs', 'core', 'cardio', 'full']
 
 export function GoalsPage() {
   const { goals, preferences, updateGoals, updatePreferences } = useAuth()
-  const [weekly, setWeekly] = useState(toNumericString(goals?.weeklyWorkouts, '0'))
-  const [minutes, setMinutes] = useState(toNumericString(goals?.dailyMinutes, '0'))
+  const [weekly, setWeekly] = useState(
+    String(positiveOrDefault(goals?.weeklyWorkouts, DEFAULT_WEEKLY_WORKOUTS)),
+  )
+  const [minutes, setMinutes] = useState(
+    String(positiveOrDefault(goals?.dailyMinutes, DEFAULT_DAILY_MINUTES)),
+  )
   const [waterGoal, setWaterGoal] = useState(
     toNumericString(goals?.dailyWaterMl ?? DEFAULT_WATER_GOAL_ML, String(DEFAULT_WATER_GOAL_ML)),
   )
@@ -19,15 +36,17 @@ export function GoalsPage() {
   const [current, setCurrent] = useState(toNumericString(goals?.currentWeightKg, '0'))
   const [target, setTarget] = useState(toNumericString(goals?.targetWeightKg, '0'))
   const [units, setUnits] = useState(preferences?.units ?? 'kg')
-  const [rest, setRest] = useState(toNumericString(preferences?.restSeconds, '0'))
+  const [rest, setRest] = useState(
+    String(positiveOrDefault(preferences?.restSeconds, DEFAULT_REST_SECONDS)),
+  )
   const [muscles, setMuscles] = useState<MuscleGroup[]>(preferences?.preferredMuscles ?? [])
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (goals) {
-      setWeekly(toNumericString(goals.weeklyWorkouts, '0'))
-      setMinutes(toNumericString(goals.dailyMinutes, '0'))
+      setWeekly(String(positiveOrDefault(goals.weeklyWorkouts, DEFAULT_WEEKLY_WORKOUTS)))
+      setMinutes(String(positiveOrDefault(goals.dailyMinutes, DEFAULT_DAILY_MINUTES)))
       setWaterGoal(
         toNumericString(goals.dailyWaterMl ?? DEFAULT_WATER_GOAL_ML, String(DEFAULT_WATER_GOAL_ML)),
       )
@@ -40,7 +59,7 @@ export function GoalsPage() {
   useEffect(() => {
     if (preferences) {
       setUnits(preferences.units)
-      setRest(toNumericString(preferences.restSeconds, '0'))
+      setRest(String(positiveOrDefault(preferences.restSeconds, DEFAULT_REST_SECONDS)))
       setMuscles(preferences.preferredMuscles)
     }
   }, [preferences])
@@ -54,9 +73,17 @@ export function GoalsPage() {
     setBusy(true)
     setSaved(false)
     try {
+      const weeklyN = positiveOrDefault(parseNumeric(weekly, 0), DEFAULT_WEEKLY_WORKOUTS)
+      const minutesN = positiveOrDefault(parseNumeric(minutes, 0), DEFAULT_DAILY_MINUTES)
+      const restN = positiveOrDefault(parseNumeric(rest, 0), DEFAULT_REST_SECONDS)
+
+      setWeekly(String(weeklyN))
+      setMinutes(String(minutesN))
+      setRest(String(restN))
+
       await updateGoals({
-        weeklyWorkouts: parseNumeric(weekly, 0),
-        dailyMinutes: parseNumeric(minutes, 0),
+        weeklyWorkouts: weeklyN,
+        dailyMinutes: minutesN,
         dailyWaterMl: parseNumeric(waterGoal, DEFAULT_WATER_GOAL_ML) || DEFAULT_WATER_GOAL_ML,
         focus,
         currentWeightKg: parseNumeric(current, 0),
@@ -64,7 +91,7 @@ export function GoalsPage() {
       })
       await updatePreferences({
         units,
-        restSeconds: parseNumeric(rest, 0),
+        restSeconds: restN,
         preferredMuscles: muscles,
       })
       setSaved(true)
@@ -92,7 +119,8 @@ export function GoalsPage() {
               inputMode="numeric"
               value={weekly}
               onChange={(e) => setWeekly(sanitizeNumericInput(e.target.value))}
-              onBlur={() => setWeekly(toNumericString(weekly, '0'))}
+              onFocus={() => clearZeroOnFocus(weekly, setWeekly)}
+              onBlur={() => blurToPositiveDefault(weekly, setWeekly, DEFAULT_WEEKLY_WORKOUTS)}
             />
           </div>
           <div>
@@ -104,11 +132,12 @@ export function GoalsPage() {
               inputMode="numeric"
               value={minutes}
               onChange={(e) => setMinutes(sanitizeNumericInput(e.target.value))}
-              onBlur={() => setMinutes(toNumericString(minutes, '0'))}
+              onFocus={() => clearZeroOnFocus(minutes, setMinutes)}
+              onBlur={() => blurToPositiveDefault(minutes, setMinutes, DEFAULT_DAILY_MINUTES)}
               aria-describedby="minutes-hint"
             />
             <p id="minutes-hint" className="mt-1.5 text-xs text-[var(--ink-muted)]">
-              In minutes — e.g. 45
+              In minutes — e.g. {DEFAULT_DAILY_MINUTES}
             </p>
           </div>
           <div>
@@ -120,12 +149,9 @@ export function GoalsPage() {
               inputMode="numeric"
               value={waterGoal}
               onChange={(e) => setWaterGoal(sanitizeNumericInput(e.target.value))}
+              onFocus={() => clearZeroOnFocus(waterGoal, setWaterGoal)}
               onBlur={() =>
-                setWaterGoal(
-                  toNumericString(waterGoal, String(DEFAULT_WATER_GOAL_ML)) === '0'
-                    ? String(DEFAULT_WATER_GOAL_ML)
-                    : toNumericString(waterGoal, String(DEFAULT_WATER_GOAL_ML)),
-                )
+                blurToPositiveDefault(waterGoal, setWaterGoal, DEFAULT_WATER_GOAL_ML)
               }
             />
             <p className="mt-1.5 text-xs text-[var(--ink-muted)]">In ml — e.g. 2000 (2 L)</p>
@@ -155,6 +181,7 @@ export function GoalsPage() {
                 inputMode="decimal"
                 value={current}
                 onChange={(e) => setCurrent(sanitizeNumericInput(e.target.value, true))}
+                onFocus={() => clearZeroOnFocus(current, setCurrent)}
                 onBlur={() => setCurrent(toNumericString(current, '0'))}
               />
             </div>
@@ -167,6 +194,7 @@ export function GoalsPage() {
                 inputMode="decimal"
                 value={target}
                 onChange={(e) => setTarget(sanitizeNumericInput(e.target.value, true))}
+                onFocus={() => clearZeroOnFocus(target, setTarget)}
                 onBlur={() => setTarget(toNumericString(target, '0'))}
               />
             </div>
@@ -201,7 +229,8 @@ export function GoalsPage() {
               inputMode="numeric"
               value={rest}
               onChange={(e) => setRest(sanitizeNumericInput(e.target.value))}
-              onBlur={() => setRest(toNumericString(rest, '0'))}
+              onFocus={() => clearZeroOnFocus(rest, setRest)}
+              onBlur={() => blurToPositiveDefault(rest, setRest, DEFAULT_REST_SECONDS)}
             />
           </div>
           <div>

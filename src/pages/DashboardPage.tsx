@@ -14,6 +14,7 @@ import { db } from '../db'
 import { ProgressRing } from '../components/ProgressRing'
 import { ExerciseImage } from '../components/ExerciseImage'
 import { MUSCLE_LABELS } from '../data/exercises'
+import { DEFAULT_WEEKLY_WORKOUTS, positiveOrDefault } from '../data/goals'
 import { getPlanDayForDate, WEEKDAY_LABELS } from '../data/plans'
 import { WaterQuickCard } from './WaterPage'
 
@@ -43,7 +44,7 @@ export function DashboardPage() {
 
   const todayWorkout = (workouts ?? []).find((w) => w.date === today)
   const todayPlan = activePlan ? getPlanDayForDate(activePlan.days, new Date()) : undefined
-  const weeklyGoal = goals?.weeklyWorkouts ?? 4
+  const weeklyGoal = positiveOrDefault(goals?.weeklyWorkouts, DEFAULT_WEEKLY_WORKOUTS)
   const progress = Math.min(1, thisWeek.length / weeklyGoal)
 
   const streak = (() => {

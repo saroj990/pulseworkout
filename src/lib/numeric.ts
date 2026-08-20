@@ -20,3 +20,18 @@ export function parseNumeric(value: string, fallback = 0): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
+
+/** On focus, clear a lone zero so the user can type a new value immediately. */
+export function clearZeroOnFocus(value: string, setValue: (next: string) => void) {
+  if (value === '0' || value === '0.0') setValue('')
+}
+
+/** On blur, if empty/zero, restore a positive default. */
+export function blurToPositiveDefault(
+  value: string,
+  setValue: (next: string) => void,
+  fallback: number,
+) {
+  const n = parseNumeric(value, 0)
+  setValue(String(n > 0 ? n : fallback))
+}

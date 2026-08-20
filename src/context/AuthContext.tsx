@@ -17,6 +17,11 @@ import {
 import { getOldDataSummary, type OldDataSummary } from '../lib/storageAlert'
 import { createPinCredentials, notifyAuthenticated, verifyPin } from '../lib/pin'
 import { normalizeUsername, usernameKey } from '../lib/authValidation'
+import {
+  DEFAULT_DAILY_MINUTES,
+  DEFAULT_REST_SECONDS,
+  DEFAULT_WEEKLY_WORKOUTS,
+} from '../data/goals'
 
 interface AuthContextValue {
   user: User | null
@@ -42,10 +47,18 @@ async function ensureSeedExercises() {
     await db.exercises.bulkAdd(allSeed)
     return
   }
+  const byName = new Map(allSeed.map((e) => [e.name, e]))
   const names = new Set(existing.map((e) => e.name))
   const missing = allSeed.filter((e) => !names.has(e.name))
   if (missing.length > 0) {
     await db.exercises.bulkAdd(missing)
+  }
+  // Keep built-in imageKeys in sync when SVG assets are added/renamed
+  for (const row of existing) {
+    const seed = byName.get(row.name)
+    if (seed && row.id != null && row.imageKey !== seed.imageKey) {
+      await db.exercises.update(row.id, { imageKey: seed.imageKey })
+    }
   }
 }
 
@@ -111,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await db.preferences.add({
         userId: id,
         units: 'kg',
-        restSeconds: 60,
+        restSeconds: DEFAULT_REST_SECONDS,
         weekStartsOn: 1,
         preferredMuscles: [],
         googleClientId: '',
@@ -120,8 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await db.goals.add({
         userId: id,
-        weeklyWorkouts: 0,
-        dailyMinutes: 0,
+        weeklyWorkouts: DEFAULT_WEEKLY_WORKOUTS,
+        dailyMinutes: DEFAULT_DAILY_MINUTES,
         dailyWaterMl: 2000,
         targetWeightKg: 0,
         currentWeightKg: 0,
