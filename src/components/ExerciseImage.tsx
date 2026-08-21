@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MuscleGroup } from '../db'
 import { MUSCLE_COLORS } from '../data/exercises'
 
 /**
- * Drop a file at `src/assets/exercises/{imageKey}.svg` and it is picked up automatically.
- * Built-in stroke icons are used when no file exists for that key.
+ * Drop files at `src/assets/exercises/{imageKey}.svg` and/or
+ * `{imageKey}.webm` / `{imageKey}.mp4`. Videos play when the tile is on screen;
+ * SVG (or stroke fallback) is used otherwise. Bundled media is precached by the PWA.
  */
 const svgModules = import.meta.glob('../assets/exercises/*.svg', {
   eager: true,
@@ -12,11 +13,33 @@ const svgModules = import.meta.glob('../assets/exercises/*.svg', {
   import: 'default',
 }) as Record<string, string>
 
-function svgUrlFor(imageKey: string): string | undefined {
-  const match = Object.entries(svgModules).find(([path]) =>
-    path.endsWith(`/${imageKey}.svg`),
+const videoModules = import.meta.glob('../assets/exercises/*.{webm,mp4}', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>
+
+function assetUrlFor(
+  modules: Record<string, string>,
+  imageKey: string,
+  exts: string[],
+): string | undefined {
+  const match = Object.entries(modules).find(([path]) =>
+    exts.some((ext) => path.endsWith(`/${imageKey}.${ext}`)),
   )
   return match?.[1]
+}
+
+function svgUrlFor(imageKey: string): string | undefined {
+  return assetUrlFor(svgModules, imageKey, ['svg'])
+}
+
+function videoUrlFor(imageKey: string): string | undefined {
+  // Prefer WebM (smaller) then MP4
+  return (
+    assetUrlFor(videoModules, imageKey, ['webm']) ??
+    assetUrlFor(videoModules, imageKey, ['mp4'])
+  )
 }
 
 /** Fallback line icons (24×24 viewBox path data) when no SVG file is present. */
@@ -60,56 +83,163 @@ const FALLBACK_PATHS: Record<string, string> = {
 interface Props {
   imageKey: string
   muscle: MuscleGroup
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'hero'
   className?: string
+  /** Prefer looping demo video when a file exists (default: true for md/lg/hero, false for sm). */
+  preferVideo?: boolean
 }
 
+/** Mobile-first: video tiles run larger on phones, tighten a bit from `sm` up. */
 const SIZES = {
   sm: 'h-12 w-12',
-  md: 'h-16 w-16',
-  lg: 'h-28 w-28',
+  md: 'h-[4.75rem] w-[4.75rem] sm:h-16 sm:w-16',
+  lg: 'h-28 w-28 sm:h-24 sm:w-24',
+  hero: 'aspect-[4/3] w-full max-h-56 sm:aspect-square sm:h-28 sm:w-28 sm:max-h-none',
 }
 
-export function ExerciseImage({ imageKey, muscle, size = 'md', className = '' }: Props) {
+function StaticIcon({
+  imageKey,
+  color,
+  svgUrl,
+}: {
+  imageKey: string
+  color: string
+  svgUrl?: string
+}) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const path = FALLBACK_PATHS[imageKey] ?? FALLBACK_PATHS.squat
+  const useFile = Boolean(svgUrl) && !imgFailed
+
+  if (useFile) {
+    return (
+      <img
+        src={svgUrl}
+        alt=""
+        className="absolute inset-[14%] h-[72%] w-[72%] object-contain"
+        onError={() => setImgFailed(true)}
+      />
+    )
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="absolute inset-[18%] h-[64%] w-[64%]"
+    >
+      <path d={path} />
+    </svg>
+  )
+}
+
+export function ExerciseImage({
+  imageKey,
+  muscle,
+  size = 'md',
+  className = '',
+  preferVideo,
+}: Props) {
   const color = MUSCLE_COLORS[muscle]
   const svgUrl = svgUrlFor(imageKey)
-  const [imgFailed, setImgFailed] = useState(false)
-  const useFile = Boolean(svgUrl) && !imgFailed
-  const path = FALLBACK_PATHS[imageKey] ?? FALLBACK_PATHS.squat
+  const bundledVideoUrl = videoUrlFor(imageKey)
+  const wantVideo = preferVideo ?? size !== 'sm'
+  const videoEnabled = wantVideo && Boolean(bundledVideoUrl)
+  const isHero = size === 'hero'
+
+  const rootRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [inView, setInView] = useState(false)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [videoFailed, setVideoFailed] = useState(false)
+
+  useEffect(() => {
+    if (!videoEnabled) return
+    const el = rootRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { rootMargin: '80px', threshold: 0.15 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [videoEnabled])
+
+  // Fetch full file → blob URL so offline playback works without HTTP Range requests
+  useEffect(() => {
+    if (!videoEnabled || !bundledVideoUrl || !inView || videoFailed) return
+    let cancelled = false
+    let objectUrl: string | undefined
+
+    fetch(bundledVideoUrl)
+      .then((r) => {
+        if (!r.ok) throw new Error(`video ${r.status}`)
+        return r.blob()
+      })
+      .then((blob) => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setBlobUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setVideoFailed(true)
+      })
+
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [videoEnabled, bundledVideoUrl, inView, videoFailed])
+
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || !blobUrl) return
+    if (inView) {
+      void v.play().catch(() => setVideoFailed(true))
+    } else {
+      v.pause()
+    }
+  }, [inView, blobUrl])
+
+  const showVideo = videoEnabled && Boolean(blobUrl) && !videoFailed
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-2xl ${SIZES[size]} ${className}`}
+      ref={rootRef}
+      className={`relative shrink-0 overflow-hidden rounded-2xl ${SIZES[size]} ${className} ${
+        showVideo || isHero ? 'ring-1 ring-black/5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]' : ''
+      }`}
       style={{
         background: `linear-gradient(145deg, ${color}22 0%, ${color}55 100%)`,
       }}
       aria-hidden
     >
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{
-          backgroundImage: `radial-gradient(circle at 30% 30%, white, transparent 55%)`,
-        }}
-      />
-      {useFile ? (
-        <img
-          src={svgUrl}
-          alt=""
-          className="absolute inset-[14%] h-[72%] w-[72%] object-contain"
-          onError={() => setImgFailed(true)}
+      {!showVideo && (
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage: `radial-gradient(circle at 30% 30%, white, transparent 55%)`,
+          }}
+        />
+      )}
+      {showVideo ? (
+        <video
+          ref={videoRef}
+          src={blobUrl ?? undefined}
+          className={`absolute inset-0 h-full w-full ${
+            isHero ? 'object-contain bg-black/[0.04] p-1 sm:p-0 sm:object-cover' : 'object-cover'
+          }`}
+          muted
+          loop
+          playsInline
+          preload="auto"
+          onError={() => setVideoFailed(true)}
         />
       ) : (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={color}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="absolute inset-[18%] h-[64%] w-[64%]"
-        >
-          <path d={path} />
-        </svg>
+        <StaticIcon imageKey={imageKey} color={color} svgUrl={svgUrl} />
       )}
     </div>
   )

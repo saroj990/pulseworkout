@@ -45,7 +45,10 @@ export default defineConfig({
         enabled: true,
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Include short exercise demos so they work offline after install
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webm,mp4}'],
+        // Short demo clips; keep each file under this limit (raise if needed)
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

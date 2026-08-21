@@ -1094,19 +1094,43 @@ export function LogWorkoutPage() {
               }`}
               style={{ animationDelay: `${exIdx * 40}ms` }}
             >
+              {isFocus ? (
+                <div className="space-y-3">
+                  <ExerciseImage
+                    imageKey={ex.imageKey}
+                    muscle={ex.muscle}
+                    size="hero"
+                    preferVideo
+                    className="mx-auto"
+                  />
+                  <div className="flex min-w-0 items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-bold text-base">{ex.exerciseName}</p>
+                        {!resting && (
+                          <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--accent)]">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--ink-muted)]">{MUSCLE_LABELS[ex.muscle]}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <div className="flex items-start gap-3">
-                <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
+                <ExerciseImage
+                  imageKey={ex.imageKey}
+                  muscle={ex.muscle}
+                  size={isNextUp ? 'md' : 'sm'}
+                  preferVideo={isNextUp}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate font-bold">{ex.exerciseName}</p>
                     {done && (
                       <span className="shrink-0 rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--brand)]">
                         Done
-                      </span>
-                    )}
-                    {isFocus && !resting && (
-                      <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--accent)]">
-                        Active
                       </span>
                     )}
                     {isNextUp && (
@@ -1128,6 +1152,7 @@ export function LogWorkoutPage() {
                   </button>
                 )}
               </div>
+              )}
 
               {(!session || isFocus || isNextUp || done) && (
                 <div className="mt-3 space-y-2">
@@ -1354,12 +1379,17 @@ export function LogWorkoutPage() {
                   key={ex.id}
                   type="button"
                   onClick={() => addExercise(ex)}
-                  className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left border border-[var(--line)] hover:border-[var(--brand)]"
+                  className="flex w-full items-center gap-3.5 rounded-2xl bg-white p-3.5 text-left border border-[var(--line)] hover:border-[var(--brand)] active:scale-[0.99] transition"
                 >
-                  <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
+                  <ExerciseImage
+                    imageKey={ex.imageKey}
+                    muscle={ex.muscle}
+                    size="lg"
+                    preferVideo
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold">{ex.name}</p>
-                    <p className="text-xs text-[var(--ink-muted)]">
+                    <p className="font-bold leading-snug">{ex.name}</p>
+                    <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
                       {MUSCLE_LABELS[ex.muscle]} · {ex.equipment}
                     </p>
                   </div>
