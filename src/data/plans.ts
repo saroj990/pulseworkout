@@ -260,6 +260,38 @@ export function getPlanDayForDate(days: PlanDay[], date: Date): PlanDay | undefi
   return days.find((d) => d.weekday === weekday)
 }
 
+export function getPlanDayForWeekday(days: PlanDay[], weekday: Weekday): PlanDay {
+  return (
+    days.find((d) => d.weekday === weekday) ?? {
+      weekday,
+      muscles: [],
+      title: 'Rest',
+      exerciseNames: [],
+    }
+  )
+}
+
+export type WorkoutPresetOption = {
+  id: string
+  label: string
+  exerciseNames: string[]
+  muscles: MuscleGroup[]
+}
+
+/** Workout days from built-in weekly templates (without changing your active plan). */
+export function templateWorkoutPresets(): WorkoutPresetOption[] {
+  return PLAN_TEMPLATES.flatMap((t) =>
+    t.days
+      .filter((d) => d.muscles.length > 0 && d.exerciseNames.length > 0)
+      .map((d) => ({
+        id: `${t.id}-w${d.weekday}`,
+        label: `${t.name} · ${d.title}`,
+        exerciseNames: [...d.exerciseNames],
+        muscles: [...d.muscles],
+      })),
+  )
+}
+
 /** Extra exercises beyond the original seed — used for richer part workouts */
 export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
   {

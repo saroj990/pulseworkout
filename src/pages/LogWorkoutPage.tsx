@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
 import {
+  CalendarDays,
   Check,
   ChevronDown,
   CircleCheck,
@@ -17,12 +18,26 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import { SaveWorkoutToPlanModal } from '../components/SaveWorkoutToPlanModal'
+import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
 import { db, type Exercise, type MuscleGroup, type WorkoutExercise, type WorkoutSet } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
 import { getExerciseDefault } from '../data/exerciseDefaults'
 import { ExerciseImage } from '../components/ExerciseImage'
-import { PART_WORKOUTS, WEEKDAY_FULL, getPlanDayForDate, type Weekday } from '../data/plans'
+import {
+  PART_WORKOUTS,
+  WEEKDAY_FULL,
+  WEEKDAY_LABELS,
+  getPlanDayForWeekday,
+  templateWorkoutPresets,
+  type Weekday,
+} from '../data/plans'
+import {
+  readLogPlanWeekdayOverride,
+  saveLogPlanWeekdayOverride,
+  clearLogPlanWeekdayOverride,
+} from '../lib/logPlanOverride'
 import { DEFAULT_DAILY_MINUTES, positiveOrDefault } from '../data/goals'
 import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
 import {
@@ -149,6 +164,13 @@ export function LogWorkoutPage() {
   const [session, setSession] = useState<WorkoutSessionState | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [showCompletePrompt, setShowCompletePrompt] = useState(false)
+  const [presetMode, setPresetMode] = useState<'replace' | 'append'>('replace')
+  const [showMoreWorkouts, setShowMoreWorkouts] = useState(false)
+  const [savePresetModal, setSavePresetModal] = useState<{
+    title: string
+    exerciseNames: string[]
+    muscles: MuscleGroup[]
+  } | null>(null)
 
   const existingForDate = useLiveQuery(async () => {
     if (!user?.id || !date) return undefined
@@ -163,11 +185,38 @@ export function LogWorkoutPage() {
   const alreadyLogged = Boolean(existingForDate) && !session
   const isToday = date === today
 
+  const calendarWeekday = useMemo(() => {
+    const d = new Date(`${date}T12:00:00`)
+    return d.getDay() as Weekday
+  }, [date])
+
+  const [planWeekdayOverride, setPlanWeekdayOverride] = useState<Weekday | null>(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    setPlanWeekdayOverride(readLogPlanWeekdayOverride(user.id, date))
+  }, [user?.id, date])
+
+  const effectivePlanWeekday = planWeekdayOverride ?? calendarWeekday
+
   const planDay = useMemo(() => {
     if (!activePlan) return undefined
-    const d = new Date(`${date}T12:00:00`)
-    return getPlanDayForDate(activePlan.days, d)
-  }, [activePlan, date])
+    return getPlanDayForWeekday(activePlan.days, effectivePlanWeekday)
+  }, [activePlan, effectivePlanWeekday])
+
+  const templatePresets = useMemo(() => templateWorkoutPresets(), [])
+
+  const weekdays = useMemo(() => [0, 1, 2, 3, 4, 5, 6] as Weekday[], [])
+
+  function selectPlanWeekday(wd: Weekday) {
+    setPlanWeekdayOverride(wd)
+    if (user?.id) saveLogPlanWeekdayOverride(user.id, date, wd)
+  }
+
+  function resetPlanWeekdayToCalendar() {
+    setPlanWeekdayOverride(null)
+    if (user?.id) clearLogPlanWeekdayOverride(user.id, date)
+  }
 
   const recentExerciseIds = useMemo(() => {
     const ids: number[] = []
@@ -233,8 +282,17 @@ export function LogWorkoutPage() {
     }
 
     if (fromPlan && activePlan) {
-      const day = getPlanDayForDate(activePlan.days, new Date())
-      if (day && day.muscles.length > 0) {
+      const wdParam = searchParams.get('weekday')
+      let wd = calendarWeekday
+      if (wdParam != null) {
+        const n = Number(wdParam)
+        if (n >= 0 && n <= 6) wd = n as Weekday
+      } else if (user?.id) {
+        const stored = readLogPlanWeekdayOverride(user.id, date)
+        if (stored != null) wd = stored
+      }
+      const day = getPlanDayForWeekday(activePlan.days, wd)
+      if (day.muscles.length > 0) {
         const picked = day.exerciseNames
           .map((n) => byName.get(n))
           .filter((e): e is Exercise => Boolean(e?.id))
@@ -243,11 +301,24 @@ export function LogWorkoutPage() {
           setSelected(picked.map((e) => toWorkoutExercise(e, units)))
           if (day.muscles.length === 1) setMuscleFilter(day.muscles[0])
           setDuration(defaultDuration)
+          setPlanWeekdayOverride(wd)
+          if (user?.id) saveLogPlanWeekdayOverride(user.id, date, wd)
           prefillsApplied.current = true
         }
       }
     }
-  }, [exercises, activePlan, searchParams, alreadyLogged, session, units, defaultDuration])
+  }, [
+    exercises,
+    activePlan,
+    searchParams,
+    alreadyLogged,
+    session,
+    units,
+    defaultDuration,
+    calendarWeekday,
+    date,
+    user?.id,
+  ])
 
   const filtered = useMemo(() => {
     const list = exercises ?? []
@@ -421,7 +492,73 @@ export function LogWorkoutPage() {
     })
   }
 
-  function applyPreset(exerciseNames: string[], presetTitle: string, muscle?: MuscleGroup) {
+  function openSavePresetToPlan(
+    title: string,
+    exerciseNames: string[],
+    muscles: MuscleGroup[],
+  ) {
+    setSavePresetModal({ title, exerciseNames, muscles })
+    setError('')
+  }
+
+  async function confirmSavePresetToPlan(weekday: Weekday) {
+    if (!user?.id || !savePresetModal) return
+    setBusy(true)
+    setError('')
+    try {
+      await upsertActivePlanDay(user.id, weekday, {
+        title: savePresetModal.title,
+        muscles: savePresetModal.muscles,
+        exerciseNames: savePresetModal.exerciseNames,
+      })
+      setMessage(`Saved “${savePresetModal.title}” to ${WEEKDAY_FULL[weekday]}.`)
+      setSavePresetModal(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save to plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function renderWorkoutPickerRow(
+    key: string,
+    label: string,
+    exerciseNames: string[],
+    muscles: MuscleGroup[],
+    presetTitle?: string,
+  ) {
+    const title = presetTitle ?? label
+    return (
+      <div
+        key={key}
+        className="flex items-stretch gap-0.5 rounded-lg border border-[var(--line)] bg-white overflow-hidden"
+      >
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2.5 py-2.5 text-left text-xs font-semibold hover:bg-[var(--brand-soft)]/40"
+          onClick={() => applyPreset(exerciseNames, title, muscles[0])}
+        >
+          <span className="truncate">{label}</span>
+          <span className="shrink-0 text-[var(--ink-muted)]">{exerciseNames.length}</span>
+        </button>
+        <button
+          type="button"
+          className="shrink-0 border-l border-[var(--line)] px-2.5 text-[var(--brand)] hover:bg-[var(--brand-soft)]"
+          aria-label={`Save ${label} to plan`}
+          onClick={() => openSavePresetToPlan(title, exerciseNames, muscles)}
+        >
+          <CalendarDays size={16} />
+        </button>
+      </div>
+    )
+  }
+
+  function applyPreset(
+    exerciseNames: string[],
+    presetTitle: string,
+    muscle?: MuscleGroup,
+    mode?: 'replace' | 'append',
+  ) {
     if (!exercises?.length || alreadyLogged) return
     const byName = new Map(exercises.map((e) => [e.name, e]))
     const picked = exerciseNames
@@ -431,10 +568,25 @@ export function LogWorkoutPage() {
       setError('Couldn’t load that preset — exercises missing from the library.')
       return
     }
-    setTitle(presetTitle)
-    setSelected(picked.map((e) => toWorkoutExercise(e, units)))
+    const action = mode ?? presetMode
+    if (action === 'append') {
+      const existingIds = new Set(selected.map((s) => s.exerciseId))
+      const newRows = picked
+        .filter((e) => !existingIds.has(e.id!))
+        .map((e) => toWorkoutExercise(e, units))
+      if (!newRows.length) {
+        setMessage('Those exercises are already in your session.')
+        setError('')
+        return
+      }
+      setSelected((prev) => [...prev, ...newRows])
+      setMessage(`Added ${newRows.length} from “${presetTitle}”. Mix and match, then start when ready.`)
+    } else {
+      setTitle(presetTitle)
+      setSelected(picked.map((e) => toWorkoutExercise(e, units)))
+      setMessage('Workout loaded — add more from any plan or start the timer.')
+    }
     if (muscle) setMuscleFilter(muscle)
-    setMessage('Preset loaded — tweak anything before you start.')
     setError('')
     clearFieldError('exercises')
     clearFieldError('sets')
@@ -644,49 +796,14 @@ export function LogWorkoutPage() {
     setError('')
     setMessage('')
     try {
-      const weekday = new Date(`${date}T12:00:00`).getDay() as Weekday
       const muscles = [...new Set(selected.map((s) => s.muscle))]
       const exerciseNames = selected.map((s) => s.exerciseName)
-      const dayPatch = {
-        weekday,
-        muscles,
+      await upsertActivePlanDay(user.id, effectivePlanWeekday, {
         title: title.trim(),
+        muscles,
         exerciseNames,
-      }
-
-      if (activePlan?.id) {
-        const days = ([0, 1, 2, 3, 4, 5, 6] as Weekday[]).map((wd) => {
-          const existing = activePlan.days.find((d) => d.weekday === wd)
-          if (wd === weekday) return dayPatch
-          return (
-            existing ?? {
-              weekday: wd,
-              muscles: [],
-              title: 'Rest',
-              exerciseNames: [],
-            }
-          )
-        })
-        await db.userPlans.update(activePlan.id, {
-          days,
-          updatedAt: new Date().toISOString(),
-        })
-      } else {
-        const days = ([0, 1, 2, 3, 4, 5, 6] as Weekday[]).map((wd) =>
-          wd === weekday
-            ? dayPatch
-            : { weekday: wd, muscles: [], title: 'Rest', exerciseNames: [] },
-        )
-        await db.userPlans.add({
-          userId: user.id,
-          templateId: 'custom',
-          name: 'My plan',
-          days,
-          active: true,
-          updatedAt: new Date().toISOString(),
-        })
-      }
-      setMessage(`Saved to plan for ${WEEKDAY_FULL[weekday]}.`)
+      })
+      setMessage(`Saved to plan for ${WEEKDAY_FULL[effectivePlanWeekday]}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save to plan')
     } finally {
@@ -980,31 +1097,159 @@ export function LogWorkoutPage() {
         )}
 
         {!session && (
-          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-[var(--brand)]" />
-              <h2 className="font-display text-base font-bold">Presets</h2>
+          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-[var(--brand)]" />
+                <h2 className="font-display text-base font-bold">Workouts</h2>
+              </div>
+              <div
+                className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 text-[0.65rem] font-bold"
+                role="group"
+                aria-label="Preset load mode"
+              >
+                <button
+                  type="button"
+                  className={`rounded-full px-2.5 py-1 ${
+                    presetMode === 'replace' ? 'bg-[var(--brand)] text-white' : 'text-[var(--ink-muted)]'
+                  }`}
+                  onClick={() => setPresetMode('replace')}
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-2.5 py-1 ${
+                    presetMode === 'append' ? 'bg-[var(--brand)] text-white' : 'text-[var(--ink-muted)]'
+                  }`}
+                  onClick={() => setPresetMode('append')}
+                >
+                  Add
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {planDay && planDay.muscles.length > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-accent px-3 py-1.5 text-xs"
-                  onClick={() => applyPreset(planDay.exerciseNames, planDay.title, planDay.muscles[0])}
-                >
-                  Today’s plan · {planDay.title}
-                </button>
+            <p className="text-xs text-[var(--ink-muted)]">
+              Pick any split — not limited to your weekly plan. Use <span className="font-bold">Add</span> to
+              mix exercises from different workouts, then start the timer.
+            </p>
+
+            {activePlan && (
+              <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-white/80 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
+                    {activePlan.name}
+                  </p>
+                  {planWeekdayOverride != null && planWeekdayOverride !== calendarWeekday && (
+                    <button
+                      type="button"
+                      className="text-[0.65rem] font-bold text-[var(--ink-muted)] underline"
+                      onClick={resetPlanWeekdayToCalendar}
+                    >
+                      Use calendar ({WEEKDAY_LABELS[calendarWeekday]})
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--ink-muted)]">
+                  Which plan day for{' '}
+                  {format(new Date(`${date}T12:00:00`), 'EEE, MMM d')}?
+                </p>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
+                  {weekdays.map((wd) => {
+                    const day = getPlanDayForWeekday(activePlan.days, wd)
+                    const isRest = day.muscles.length === 0
+                    const selected = effectivePlanWeekday === wd
+                    return (
+                      <button
+                        key={wd}
+                        type="button"
+                        title={day.title}
+                        className={`shrink-0 rounded-xl px-2.5 py-2 text-center text-[0.65rem] font-bold leading-tight transition ${
+                          selected
+                            ? 'bg-[var(--brand)] text-white shadow-sm'
+                            : isRest
+                              ? 'border border-dashed border-[var(--line)] bg-[var(--bg)] text-[var(--ink-muted)]'
+                              : 'border border-[var(--line)] bg-white hover:border-[var(--brand)]'
+                        }`}
+                        onClick={() => selectPlanWeekday(wd)}
+                      >
+                        <span className="block">{WEEKDAY_LABELS[wd]}</span>
+                        <span className={`block mt-0.5 font-semibold ${selected ? 'text-white/90' : ''}`}>
+                          {isRest ? 'Rest' : day.title}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {planDay && planDay.muscles.length > 0 ? (
+                  <div className="space-y-2">
+                    {renderWorkoutPickerRow(
+                      `plan-${effectivePlanWeekday}`,
+                      `${planDay.title} (your plan)`,
+                      planDay.exerciseNames,
+                      planDay.muscles,
+                      planDay.title,
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-accent w-full py-2 text-sm"
+                      onClick={() =>
+                        applyPreset(planDay.exerciseNames, planDay.title, planDay.muscles[0])
+                      }
+                    >
+                      {presetMode === 'append' ? 'Add' : 'Load'} all · {planDay.exerciseNames.length}{' '}
+                      exercises
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    Rest day selected — choose another day or pick a workout below.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                Body-part workouts
+              </p>
+              <div className="space-y-1.5">
+                {(Object.keys(PART_WORKOUTS) as MuscleGroup[]).map((m) =>
+                  renderWorkoutPickerRow(
+                    `part-${m}`,
+                    PART_WORKOUTS[m].title,
+                    PART_WORKOUTS[m].exerciseNames,
+                    [m],
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-left text-sm font-bold"
+                onClick={() => setShowMoreWorkouts((v) => !v)}
+                aria-expanded={showMoreWorkouts}
+              >
+                Other plan templates
+                <ChevronDown
+                  size={18}
+                  className={`shrink-0 text-[var(--ink-muted)] transition ${showMoreWorkouts ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {showMoreWorkouts && (
+                <div className="mt-2 max-h-60 space-y-1.5 overflow-y-auto">
+                  {templatePresets.map((opt) =>
+                    renderWorkoutPickerRow(
+                      opt.id,
+                      opt.label,
+                      opt.exerciseNames,
+                      opt.muscles,
+                      opt.label,
+                    ),
+                  )}
+                </div>
               )}
-              {(Object.keys(PART_WORKOUTS) as MuscleGroup[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-bold hover:border-[var(--brand)]"
-                  onClick={() => applyPreset(PART_WORKOUTS[m].exerciseNames, PART_WORKOUTS[m].title, m)}
-                >
-                  {PART_WORKOUTS[m].title}
-                </button>
-              ))}
             </div>
           </section>
         )}
@@ -1433,6 +1678,16 @@ export function LogWorkoutPage() {
           </div>
         </div>
       )}
+
+      <SaveWorkoutToPlanModal
+        open={savePresetModal != null}
+        workoutTitle={savePresetModal?.title ?? ''}
+        exerciseCount={savePresetModal?.exerciseNames.length ?? 0}
+        initialWeekday={effectivePlanWeekday}
+        busy={busy}
+        onClose={() => setSavePresetModal(null)}
+        onConfirm={(wd) => void confirmSavePresetToPlan(wd)}
+      />
     </div>
   )
 }

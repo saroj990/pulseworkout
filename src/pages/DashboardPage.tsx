@@ -15,7 +15,8 @@ import { ProgressRing } from '../components/ProgressRing'
 import { ExerciseImage } from '../components/ExerciseImage'
 import { MUSCLE_LABELS } from '../data/exercises'
 import { DEFAULT_WEEKLY_WORKOUTS, positiveOrDefault } from '../data/goals'
-import { getPlanDayForDate, WEEKDAY_LABELS } from '../data/plans'
+import { getPlanDayForWeekday, WEEKDAY_LABELS, type Weekday } from '../data/plans'
+import { readLogPlanWeekdayOverride } from '../lib/logPlanOverride'
 import { WaterQuickCard } from './WaterPage'
 
 export function DashboardPage() {
@@ -43,7 +44,18 @@ export function DashboardPage() {
   })
 
   const todayWorkout = (workouts ?? []).find((w) => w.date === today)
-  const todayPlan = activePlan ? getPlanDayForDate(activePlan.days, new Date()) : undefined
+  const calendarWeekday = new Date().getDay() as Weekday
+  const planWeekdayForToday =
+    user?.id != null
+      ? (readLogPlanWeekdayOverride(user.id, today) ?? calendarWeekday)
+      : calendarWeekday
+  const todayPlan = activePlan
+    ? getPlanDayForWeekday(activePlan.days, planWeekdayForToday)
+    : undefined
+  const planDayOverridden =
+    user?.id != null &&
+    readLogPlanWeekdayOverride(user.id, today) != null &&
+    planWeekdayForToday !== calendarWeekday
   const weeklyGoal = positiveOrDefault(goals?.weeklyWorkouts, DEFAULT_WEEKLY_WORKOUTS)
   const progress = Math.min(1, thisWeek.length / weeklyGoal)
 
@@ -257,7 +269,8 @@ export function DashboardPage() {
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
-                  {activePlan.name} · {WEEKDAY_LABELS[todayPlan.weekday]}
+                  {activePlan.name} · {WEEKDAY_LABELS[planWeekdayForToday]}
+                  {planDayOverridden ? ' (your pick)' : ''}
                 </p>
                 <Link to="/plans" className="text-xs font-bold text-[var(--ink-muted)]">
                   Change
@@ -273,10 +286,15 @@ export function DashboardPage() {
                     {todayPlan.exerciseNames.length} exercises
                   </p>
                   {!todayWorkout && (
-                    <Link to="/log?fromPlan=1" className="btn btn-accent mt-4 w-full">
-                      <Plus size={18} />
-                      Start today’s plan
-                    </Link>
+                    <div className="mt-4 grid gap-2">
+                      <Link to="/log?fromPlan=1" className="btn btn-accent w-full">
+                        <Plus size={18} />
+                        Load {todayPlan.title}
+                      </Link>
+                      <Link to="/log" className="btn btn-secondary w-full text-sm">
+                        Build custom workout
+                      </Link>
+                    </div>
                   )}
                 </>
               )}

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, Check, Pencil, Sparkles } from 'lucide-react'
+import { SaveWorkoutToPlanModal } from '../components/SaveWorkoutToPlanModal'
+import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
 import { db, type MuscleGroup, type UserPlan } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
@@ -36,6 +38,12 @@ export function PlansPage() {
   const [editingWeekday, setEditingWeekday] = useState<Weekday | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [saveWorkoutModal, setSaveWorkoutModal] = useState<{
+    title: string
+    exerciseNames: string[]
+    muscles: MuscleGroup[]
+    initialWeekday: Weekday
+  } | null>(null)
 
   const activePlan = useLiveQuery(async () => {
     if (!user?.id) return undefined
@@ -144,6 +152,34 @@ export function PlansPage() {
 
   const editingDay = editingWeekday != null ? customDays.find((d) => d.weekday === editingWeekday) : null
 
+  function openSaveWorkoutToPlan(
+    title: string,
+    exerciseNames: string[],
+    muscles: MuscleGroup[],
+    initialWeekday: Weekday,
+  ) {
+    setSaveWorkoutModal({ title, exerciseNames, muscles, initialWeekday })
+  }
+
+  async function confirmSaveWorkoutToPlan(weekday: Weekday) {
+    if (!user?.id || !saveWorkoutModal) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await upsertActivePlanDay(user.id, weekday, {
+        title: saveWorkoutModal.title,
+        muscles: saveWorkoutModal.muscles,
+        exerciseNames: saveWorkoutModal.exerciseNames,
+      })
+      setMessage(`Saved “${saveWorkoutModal.title}” to ${WEEKDAY_FULL[weekday]}.`)
+      setSaveWorkoutModal(null)
+    } catch {
+      setMessage('Could not save that workout to your plan.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <header className="animate-fade-up">
@@ -211,23 +247,37 @@ export function PlansPage() {
                   </span>
                 )}
               </div>
-              <div className="week-strip mt-3">
-                {t.days.map((d) => (
-                  <div
-                    key={d.weekday}
-                    className={`week-day ${
-                      d.muscles.length === 0
-                        ? 'border border-[var(--line)] bg-white text-[var(--ink-muted)]'
-                        : 'bg-[var(--brand)] text-white'
-                    }`}
-                    title={d.muscles.length === 0 ? 'Rest' : d.title}
-                  >
-                    <p className="week-day__name">{WEEKDAY_LABELS[d.weekday]}</p>
-                    <p className="week-day__focus">
-                      {d.muscles.length === 0 ? 'Rest' : d.title.split(/[\s+/]/)[0]}
-                    </p>
-                  </div>
-                ))}
+              <div className="mt-3 space-y-1.5">
+                <p className="text-xs text-[var(--ink-muted)]">
+                  Tap a workout to save it to your active plan (pick the day).
+                </p>
+                <div className="week-strip">
+                  {t.days.map((d) =>
+                    d.muscles.length === 0 ? (
+                      <div
+                        key={d.weekday}
+                        className="week-day border border-[var(--line)] bg-white text-[var(--ink-muted)]"
+                        title="Rest"
+                      >
+                        <p className="week-day__name">{WEEKDAY_LABELS[d.weekday]}</p>
+                        <p className="week-day__focus">Rest</p>
+                      </div>
+                    ) : (
+                      <button
+                        key={d.weekday}
+                        type="button"
+                        className="week-day bg-[var(--brand)] text-white hover:opacity-90"
+                        title={`Save ${d.title} to plan`}
+                        onClick={() =>
+                          openSaveWorkoutToPlan(d.title, d.exerciseNames, d.muscles, d.weekday)
+                        }
+                      >
+                        <p className="week-day__name">{WEEKDAY_LABELS[d.weekday]}</p>
+                        <p className="week-day__focus">{d.title.split(/[\s+/]/)[0]}</p>
+                      </button>
+                    ),
+                  )}
+                </div>
               </div>
               <button
                 type="button"
@@ -316,12 +366,25 @@ export function PlansPage() {
                       {part.exerciseNames.join(' · ')}
                     </p>
                   </div>
-                  <Link
-                    to={`/log?part=${m}`}
-                    className="btn btn-accent shrink-0 px-3 py-2 text-sm"
-                  >
-                    Start
-                  </Link>
+                  <div className="flex shrink-0 flex-col gap-1.5">
+                    <Link to={`/log?part=${m}`} className="btn btn-accent px-3 py-2 text-sm">
+                      Start
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn btn-secondary px-3 py-2 text-xs"
+                      onClick={() =>
+                        openSaveWorkoutToPlan(
+                          part.title,
+                          part.exerciseNames,
+                          [m],
+                          new Date().getDay() as Weekday,
+                        )
+                      }
+                    >
+                      Save to plan
+                    </button>
+                  </div>
                 </div>
               </div>
             )
@@ -373,6 +436,16 @@ export function PlansPage() {
           </div>
         </div>
       )}
+
+      <SaveWorkoutToPlanModal
+        open={saveWorkoutModal != null}
+        workoutTitle={saveWorkoutModal?.title ?? ''}
+        exerciseCount={saveWorkoutModal?.exerciseNames.length ?? 0}
+        initialWeekday={saveWorkoutModal?.initialWeekday ?? 0}
+        busy={busy}
+        onClose={() => setSaveWorkoutModal(null)}
+        onConfirm={(wd) => void confirmSaveWorkoutToPlan(wd)}
+      />
     </div>
   )
 }
