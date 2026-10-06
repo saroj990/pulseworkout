@@ -1,4 +1,11 @@
 import type { Exercise, MuscleGroup } from '../db'
+import {
+  CARDIO_EXERCISE_NAMES,
+  CARDIO_PLAN_DAY_A,
+  CARDIO_PLAN_DAY_B,
+  CARDIO_PLAN_DAY_C,
+  CARDIO_SEED_EXERCISES,
+} from './cardioExercises'
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6 // Sun–Sat
 
@@ -58,7 +65,7 @@ export const PART_WORKOUTS: Record<MuscleGroup, { title: string; exerciseNames: 
   },
   cardio: {
     title: 'Cardio Day',
-    exerciseNames: ['Treadmill Run', 'Jump Rope', 'Rowing Machine', 'Burpee'],
+    exerciseNames: [...CARDIO_EXERCISE_NAMES],
   },
   full: {
     title: 'Full Body',
@@ -195,6 +202,22 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
         'Walking Lunge',
         'Russian Twist',
       ]),
+      rest(6),
+    ],
+  },
+  {
+    id: 'cardio-conditioning',
+    name: 'Cardio Conditioning',
+    tag: 'Mon / Wed / Fri',
+    description:
+      'Bodyweight cardio and core — jumps, jacks, mountain climbers, and more. Three focused sessions per week.',
+    days: [
+      rest(0),
+      day(1, ['cardio'], 'Cardio A · Jumps', CARDIO_PLAN_DAY_A),
+      rest(2),
+      day(3, ['cardio'], 'Cardio B · Core & climbers', CARDIO_PLAN_DAY_B),
+      rest(4),
+      day(5, ['cardio'], 'Cardio C · Mix', CARDIO_PLAN_DAY_C),
       rest(6),
     ],
   },
@@ -343,4 +366,5 @@ export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
     imageKey: 'rower',
     isCustom: false,
   },
+  ...CARDIO_SEED_EXERCISES,
 ]
