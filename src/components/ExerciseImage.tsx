@@ -91,10 +91,10 @@ interface Props {
 
 /** Mobile-first: video tiles run larger on phones, tighten a bit from `sm` up. */
 const SIZES = {
-  sm: 'h-12 w-12',
-  md: 'h-[4.75rem] w-[4.75rem] sm:h-16 sm:w-16',
-  lg: 'h-28 w-28 sm:h-24 sm:w-24',
-  hero: 'aspect-[4/3] w-full max-h-56 sm:aspect-square sm:h-28 sm:w-28 sm:max-h-none',
+  sm: 'h-9 w-9 sm:h-12 sm:w-12',
+  md: 'h-12 w-12 sm:h-16 sm:w-16',
+  lg: 'h-14 w-14 sm:h-24 sm:w-24',
+  hero: 'aspect-[5/3] w-full max-h-24 sm:aspect-square sm:max-h-36 sm:h-28 sm:w-28 md:max-h-none',
 }
 
 function StaticIcon({

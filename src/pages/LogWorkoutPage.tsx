@@ -16,7 +16,6 @@ import {
   Sparkles,
   Timer,
   Trash2,
-  X,
 } from 'lucide-react'
 import { SaveWorkoutToPlanModal } from '../components/SaveWorkoutToPlanModal'
 import { upsertActivePlanDay } from '../lib/planStorage'
@@ -153,7 +152,6 @@ export function LogWorkoutPage() {
   const [duration, setDuration] = useState(defaultDuration)
   const [notes, setNotes] = useState('')
   const [selected, setSelected] = useState<WorkoutExercise[]>([])
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | 'all'>('all')
   const [restLeft, setRestLeft] = useState<number | null>(null)
@@ -171,6 +169,8 @@ export function LogWorkoutPage() {
     exerciseNames: string[]
     muscles: MuscleGroup[]
   } | null>(null)
+  type LogWizardStep = 'details' | 'template' | 'exercises'
+  const [logStep, setLogStep] = useState<LogWizardStep>('details')
 
   const existingForDate = useLiveQuery(async () => {
     if (!user?.id || !date) return undefined
@@ -243,6 +243,7 @@ export function LogWorkoutPage() {
     setNotes(saved.notes)
     setSelected(saved.exercises)
     prefillsApplied.current = true
+    setLogStep('exercises')
   }, [user?.id])
 
   // Keep a stable tick while a session is open — don't reset the interval on every session field change
@@ -277,6 +278,7 @@ export function LogWorkoutPage() {
         setMuscleFilter(part)
         setDuration(defaultDuration)
         prefillsApplied.current = true
+        setLogStep('exercises')
       }
       return
     }
@@ -304,6 +306,7 @@ export function LogWorkoutPage() {
           setPlanWeekdayOverride(wd)
           if (user?.id) saveLogPlanWeekdayOverride(user.id, date, wd)
           prefillsApplied.current = true
+          setLogStep('exercises')
         }
       }
     }
@@ -326,7 +329,11 @@ export function LogWorkoutPage() {
     return list
       .filter((ex) => {
         const q = query.trim().toLowerCase()
-        const matchQ = !q || ex.name.toLowerCase().includes(q)
+        const matchQ =
+          !q ||
+          ex.name.toLowerCase().includes(q) ||
+          ex.equipment.toLowerCase().includes(q) ||
+          MUSCLE_LABELS[ex.muscle].toLowerCase().includes(q)
         const matchM = muscleFilter === 'all' || ex.muscle === muscleFilter
         return matchQ && matchM
       })
@@ -581,15 +588,136 @@ export function LogWorkoutPage() {
       }
       setSelected((prev) => [...prev, ...newRows])
       setMessage(`Added ${newRows.length} from “${presetTitle}”. Mix and match, then start when ready.`)
+      if (logStep === 'template') setLogStep('exercises')
     } else {
       setTitle(presetTitle)
       setSelected(picked.map((e) => toWorkoutExercise(e, units)))
       setMessage('Workout loaded — add more from any plan or start the timer.')
+      if (!session && logStep === 'template') setLogStep('exercises')
     }
     if (muscle) setMuscleFilter(muscle)
     setError('')
     clearFieldError('exercises')
     clearFieldError('sets')
+  }
+
+  function continueFromDetails() {
+    const errors = validateWorkout({
+      title,
+      date,
+      duration,
+      selected: [],
+      requireSets: false,
+    })
+    delete errors.exercises
+    delete errors.sets
+    setFieldErrors(errors)
+    if (errors.title || errors.date || errors.duration) {
+      setError('Fix the highlighted fields to continue.')
+      return
+    }
+    setError('')
+    setLogStep('template')
+  }
+
+  function renderWizardSteps() {
+    const steps: { id: LogWizardStep; label: string; n: number }[] = [
+      { id: 'details', label: 'Details', n: 1 },
+      { id: 'template', label: 'Template', n: 2 },
+      { id: 'exercises', label: 'Exercises', n: 3 },
+    ]
+    const current = logStep === 'details' ? 1 : logStep === 'template' ? 2 : 3
+    return (
+      <ol className="flex items-center gap-1 sm:gap-2" aria-label="Log workout steps">
+        {steps.map((s) => {
+          const done = s.n < current
+          const active = s.n === current
+          return (
+            <li
+              key={s.id}
+              className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2 py-1.5 text-[0.65rem] font-bold sm:text-xs ${
+                active
+                  ? 'bg-[var(--brand)] text-white'
+                  : done
+                    ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                    : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.6rem] ${
+                  active ? 'bg-white/20' : ''
+                }`}
+              >
+                {s.n}
+              </span>
+              <span className="truncate">{s.label}</span>
+            </li>
+          )
+        })}
+      </ol>
+    )
+  }
+
+  function renderExerciseBrowser(className = '') {
+    return (
+      <div className={`flex min-h-0 flex-col gap-2 ${className}`}>
+        <div className="relative shrink-0">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]" />
+          <input
+            className="input input-with-icon"
+            placeholder="Search name, muscle, or equipment"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search exercises"
+          />
+        </div>
+        <div className="flex shrink-0 gap-2 overflow-x-auto pb-0.5">
+          {muscles.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMuscleFilter(m)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
+                muscleFilter === m
+                  ? 'bg-[var(--brand)] text-white'
+                  : 'bg-white border border-[var(--line)]'
+              }`}
+            >
+              {m === 'all' ? 'All' : MUSCLE_LABELS[m]}
+            </button>
+          ))}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-0.5 px-0.5">
+          {filtered.length === 0 ? (
+            <p className="py-6 text-center text-sm text-[var(--ink-muted)]">
+              {query.trim() ? 'No exercises match your search.' : 'No exercises in library yet.'}
+            </p>
+          ) : (
+            <ul className="space-y-1.5 pb-1">
+              {filtered.map((ex) => (
+                <li key={ex.id}>
+                  <button
+                    type="button"
+                    onClick={() => addExercise(ex)}
+                    disabled={selected.some((s) => s.exerciseId === ex.id)}
+                    className="flex w-full items-center gap-2.5 rounded-xl bg-white p-2.5 text-left border border-[var(--line)] hover:border-[var(--brand)] disabled:opacity-50"
+                  >
+                    <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{ex.name}</p>
+                      <p className="truncate text-[0.65rem] text-[var(--ink-muted)]">
+                        {MUSCLE_LABELS[ex.muscle]} · {ex.equipment}
+                      </p>
+                    </div>
+                    <Plus size={16} className="shrink-0 text-[var(--brand)]" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    )
   }
 
   function addExercise(ex: Exercise) {
@@ -598,7 +726,6 @@ export function LogWorkoutPage() {
     setSelected((prev) => [toWorkoutExercise(ex, units), ...prev])
     clearFieldError('exercises')
     clearFieldError('sets')
-    setPickerOpen(false)
   }
 
   function updateSet(exIdx: number, setIdx: number, patch: Partial<WorkoutSet>) {
@@ -926,16 +1053,21 @@ export function LogWorkoutPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <header className="animate-fade-up">
-        <h1 className="font-display text-3xl font-extrabold">
+    <div className="flex min-h-0 flex-col gap-4 sm:gap-5">
+      <header className="animate-fade-up shrink-0">
+        <h1 className="font-display text-2xl font-extrabold sm:text-3xl">
           {session ? title : 'Log workout'}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           {session
             ? 'Mark each exercise done — 1 min rest between them (skippable).'
-            : 'Build a session, save it to your plan, or start the timer.'}
+            : logStep === 'details'
+              ? 'Step 1 — set the basics for this session.'
+              : logStep === 'template'
+                ? 'Step 2 — load a template or skip to pick exercises yourself.'
+                : 'Step 3 — search and add exercises, then start.'}
         </p>
+        {!session && <div className="mt-3">{renderWizardSteps()}</div>}
       </header>
 
       {session && (
@@ -1028,10 +1160,10 @@ export function LogWorkoutPage() {
           if (session) void onCompleteManual()
           else void onSaveToPlan(e)
         }}
-        className="space-y-4"
+        className="flex min-h-0 flex-col gap-4"
         noValidate
       >
-        {!session && (
+        {!session && logStep === 'details' && (
           <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
             <div>
               <label className="label" htmlFor="title">Title</label>
@@ -1083,21 +1215,14 @@ export function LogWorkoutPage() {
                 />
               </div>
             </div>
-            <div>
-              <label className="label" htmlFor="notes">Notes</label>
-              <input
-                id="notes"
-                className="input"
-                placeholder="Felt strong, shorter rest…"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
+            <button type="button" className="btn btn-primary w-full" onClick={continueFromDetails}>
+              Continue
+            </button>
           </section>
         )}
 
-        {!session && (
-          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-4">
+        {!session && logStep === 'template' && (
+          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-4 max-h-[min(70dvh,32rem)] overflow-y-auto overscroll-contain">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[var(--brand)]" />
@@ -1251,12 +1376,62 @@ export function LogWorkoutPage() {
                 </div>
               )}
             </div>
+            <div className="grid gap-2 border-t border-[var(--line)] pt-3 sm:grid-cols-2">
+              <button type="button" className="btn btn-secondary w-full" onClick={() => setLogStep('details')}>
+                Back
+              </button>
+              <button type="button" className="btn btn-primary w-full" onClick={() => setLogStep('exercises')}>
+                Skip — pick exercises
+              </button>
+            </div>
           </section>
         )}
 
-        <div className="flex items-center justify-between animate-fade-up">
-          <h2 className="font-display text-xl font-bold">Exercises</h2>
+        {!session && logStep === 'exercises' && (
+          <>
+            <section className="glass rounded-[var(--radius)] p-3 space-y-2 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <p className="font-bold truncate">{title}</p>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-[var(--brand)]"
+                  onClick={() => setLogStep('details')}
+                >
+                  Edit details
+                </button>
+              </div>
+              <p className="text-xs text-[var(--ink-muted)]">
+                {format(new Date(`${date}T12:00:00`), 'EEE, MMM d')} · {duration} min
+              </p>
+              <label className="label" htmlFor="notes">Notes (optional)</label>
+              <input
+                id="notes"
+                className="input"
+                placeholder="Felt strong, shorter rest…"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </section>
+            <section
+              className="glass flex h-[min(34dvh,18rem)] flex-col overflow-hidden rounded-[var(--radius)] p-3 sm:h-[min(42dvh,22rem)]"
+            >
+              <h2 className="mb-2 shrink-0 font-display text-sm font-bold">Add exercises</h2>
+              {renderExerciseBrowser('min-h-0 flex-1')}
+            </section>
+          </>
+        )}
+
+        {(session || logStep === 'exercises') && (
+        <div className="flex items-center justify-between animate-fade-up shrink-0">
+          <h2 className="font-display text-lg font-bold sm:text-xl">
+            Your list ({selected.length})
+          </h2>
           {!session && (
+            <button type="button" className="text-xs font-bold text-[var(--brand)]" onClick={() => setLogStep('template')}>
+              Templates
+            </button>
+          )}
+          {session && (
             <div className="flex gap-2">
               {restLeft != null ? (
                 <button
@@ -1271,41 +1446,40 @@ export function LogWorkoutPage() {
                   Rest timer
                 </button>
               )}
-              <button
-                type="button"
-                className="btn btn-accent px-3 py-1.5 text-sm"
-                onClick={() => setPickerOpen(true)}
-              >
-                <Plus size={16} /> Add
-              </button>
             </div>
           )}
         </div>
+        )}
 
-        {fieldErrors.exercises && (
+        {(session || logStep === 'exercises') && fieldErrors.exercises && (
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
             {fieldErrors.exercises}
           </p>
         )}
-        {fieldErrors.sets && (
+        {(session || logStep === 'exercises') && fieldErrors.sets && (
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
             {fieldErrors.sets}
           </p>
         )}
 
-        {selected.length === 0 && (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className={`glass flex w-full flex-col items-center justify-center gap-2 rounded-[var(--radius)] border-2 border-dashed py-10 text-[var(--ink-muted)] ${
+        {(session || logStep === 'exercises') && selected.length === 0 && (
+          <p
+            className={`rounded-xl border border-dashed px-4 py-6 text-center text-sm text-[var(--ink-muted)] ${
               fieldErrors.exercises ? 'border-[var(--danger)]' : 'border-[var(--line)]'
             }`}
           >
-            <Plus size={28} />
-            <span className="font-bold">Pick your first exercise</span>
-          </button>
+            Search above and tap exercises to add them here.
+          </p>
         )}
 
+        {(session || logStep === 'exercises') && (
+        <div
+          className={
+            session
+              ? 'space-y-4'
+              : 'max-h-[min(30dvh,16rem)] space-y-3 overflow-y-auto overscroll-contain sm:max-h-none sm:overflow-visible sm:space-y-4'
+          }
+        >
         {selected.map((ex, exIdx) => {
           const done = isExerciseDone(ex)
           const isFocus = Boolean(session) && focusIndex === exIdx && !done && !resting
@@ -1541,6 +1715,8 @@ export function LogWorkoutPage() {
             </section>
           )
         })}
+        </div>
+        )}
 
         {error && (
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
@@ -1553,8 +1729,8 @@ export function LogWorkoutPage() {
           </p>
         )}
 
-        {!session ? (
-          <div className="grid gap-2 sm:grid-cols-2">
+        {!session && logStep === 'exercises' ? (
+          <div className="sticky bottom-0 z-10 -mx-1 grid gap-2 border-t border-[var(--line)] bg-[var(--bg)]/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:grid-cols-2">
             <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
               {busy ? 'Saving…' : 'Save to plan'}
             </button>
@@ -1567,7 +1743,7 @@ export function LogWorkoutPage() {
               <Play size={16} /> Start workout
             </button>
           </div>
-        ) : (
+        ) : !session ? null : (
           !allExercisesDone && (
             <button
               type="button"
@@ -1580,71 +1756,6 @@ export function LogWorkoutPage() {
           )
         )}
       </form>
-
-      {pickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-          <div className="flex max-h-[85svh] w-full max-w-lg flex-col rounded-t-[1.5rem] bg-[var(--bg)] sm:rounded-[var(--radius)]">
-            <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-              <h3 className="font-display text-lg font-bold">Add exercise</h3>
-              <button type="button" className="btn btn-ghost p-2" onClick={() => setPickerOpen(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="space-y-3 px-4 py-3">
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]" />
-                <input
-                  className="input input-with-icon"
-                  placeholder="Search exercises"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {muscles.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setMuscleFilter(m)}
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
-                      muscleFilter === m
-                        ? 'bg-[var(--brand)] text-white'
-                        : 'bg-white border border-[var(--line)]'
-                    }`}
-                  >
-                    {m === 'all' ? 'All' : MUSCLE_LABELS[m]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1 space-y-2 overflow-y-auto px-4 pb-6">
-              {filtered.map((ex) => (
-                <button
-                  key={ex.id}
-                  type="button"
-                  onClick={() => addExercise(ex)}
-                  className="flex w-full items-center gap-3.5 rounded-2xl bg-white p-3.5 text-left border border-[var(--line)] hover:border-[var(--brand)] active:scale-[0.99] transition"
-                >
-                  <ExerciseImage
-                    imageKey={ex.imageKey}
-                    muscle={ex.muscle}
-                    size="lg"
-                    preferVideo
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold leading-snug">{ex.name}</p>
-                    <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                      {MUSCLE_LABELS[ex.muscle]} · {ex.equipment}
-                    </p>
-                  </div>
-                  <ChevronDown className="-rotate-90 text-[var(--ink-muted)]" size={16} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {showCompletePrompt && session && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-5">
