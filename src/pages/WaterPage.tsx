@@ -237,7 +237,7 @@ export function WaterPage() {
 }
 
 /** Compact widget used on the dashboard */
-export function WaterQuickCard() {
+export function WaterQuickCard({ compact = false }: { compact?: boolean }) {
   const { user, goals } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
   const goalMl = goals?.dailyWaterMl && goals.dailyWaterMl > 0 ? goals.dailyWaterMl : DEFAULT_WATER_GOAL_ML
@@ -266,35 +266,46 @@ export function WaterQuickCard() {
   }
 
   return (
-    <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '85ms' }}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Water</p>
-          <p className="mt-1 font-display text-xl font-bold">
+    <section
+      className={`glass animate-fade-up rounded-[var(--radius)] ${compact ? 'p-3' : 'p-4'}`}
+      style={{ animationDelay: '85ms' }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[0.65rem] font-bold uppercase tracking-wider text-sky-700">Water</p>
+          <p className={`font-display font-bold ${compact ? 'text-base' : 'mt-1 text-xl'}`}>
             {formatWater(total)}
-            <span className="ml-1 text-sm font-bold text-[var(--ink-muted)]">
+            <span className="ml-1 text-xs font-bold text-[var(--ink-muted)] sm:text-sm">
               / {formatWater(goalMl)}
             </span>
           </p>
         </div>
-        <Link to="/water" className="text-sm font-bold text-[var(--brand)]">
+        <Link to="/water" className="shrink-0 text-xs font-bold text-[var(--brand)] sm:text-sm">
           Open
         </Link>
       </div>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white border border-[var(--line)]">
+      <div className={`overflow-hidden rounded-full bg-white border border-[var(--line)] ${compact ? 'mt-2 h-2' : 'mt-3 h-2.5'}`}>
         <div
           className="h-full rounded-full bg-sky-500 transition-all"
           style={{ width: `${progress * 100}%` }}
         />
       </div>
-      <div className="mt-3 flex gap-2">
-        <button type="button" className="btn btn-secondary flex-1 py-2 text-sm" onClick={() => quickAdd(250)}>
+      <div className={`flex gap-1.5 ${compact ? 'mt-2' : 'mt-3'}`}>
+        <button
+          type="button"
+          className={`btn btn-secondary flex-1 ${compact ? 'py-1.5 text-xs' : 'py-2 text-sm'}`}
+          onClick={() => quickAdd(250)}
+        >
           <Plus size={14} /> 250
         </button>
-        <button type="button" className="btn btn-secondary flex-1 py-2 text-sm" onClick={() => quickAdd(500)}>
+        <button
+          type="button"
+          className={`btn btn-secondary flex-1 ${compact ? 'py-1.5 text-xs' : 'py-2 text-sm'}`}
+          onClick={() => quickAdd(500)}
+        >
           <Plus size={14} /> 500
         </button>
-        <Link to="/water" className="btn btn-primary flex-1 py-2 text-sm">
+        <Link to="/water" className={`btn btn-primary flex-1 ${compact ? 'py-1.5 text-xs' : 'py-2 text-sm'}`}>
           More
         </Link>
       </div>
