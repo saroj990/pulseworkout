@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PinLockProvider, usePinLock } from './context/PinLockContext'
 import { AppShell } from './components/AppShell'
+import { ThemeSync } from './components/ThemeSync'
 import { PinLockScreen } from './components/PinLockScreen'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -42,6 +43,7 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+      <ThemeSync />
       <PinLockProvider>
         <Routes>
           <Route

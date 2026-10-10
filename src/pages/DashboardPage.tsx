@@ -8,23 +8,86 @@ import {
   startOfWeek,
   subDays,
 } from 'date-fns'
-import { CalendarDays, Dumbbell, Flame, History, Plus, Timer } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
-import { db } from '../db'
-import { ProgressRing } from '../components/ProgressRing'
+import {
+  Bell,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock3,
+  Droplets,
+  Dumbbell,
+  Flame,
+  Plus,
+  Settings,
+  Target,
+} from 'lucide-react'
 import { ExerciseImage } from '../components/ExerciseImage'
+import { ThemeToggle } from '../components/ThemeToggle'
+import { useAuth } from '../context/AuthContext'
+import { db, type MuscleGroup, type Workout } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
+import { imageKeyForExercise } from '../data/exerciseImageKeys'
 import { DEFAULT_WEEKLY_WORKOUTS, positiveOrDefault } from '../data/goals'
-import { getPlanDayForWeekday, WEEKDAY_LABELS, type Weekday } from '../data/plans'
+import { getPlanDayForWeekday, type Weekday } from '../data/plans'
 import { readLogPlanWeekdayOverride } from '../lib/logPlanOverride'
-import { WaterQuickCard } from './WaterPage'
+import { DEFAULT_WATER_GOAL_ML, formatWater, waterProgress } from '../lib/water'
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good Morning'
+  if (h < 17) return 'Good Afternoon'
+  return 'Good Evening'
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
+
+function litersCompact(ml: number): string {
+  const liters = ml / 1000
+  if (liters >= 10 || Number.isInteger(liters)) return String(liters)
+  return liters.toFixed(1)
+}
+
+function primaryMuscle(workout: Workout): MuscleGroup | undefined {
+  const counts = new Map<MuscleGroup, number>()
+  for (const ex of workout.exercises) {
+    counts.set(ex.muscle, (counts.get(ex.muscle) ?? 0) + 1)
+  }
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  return sorted[0]?.[0]
+}
+
+function focusRegionLabel(muscles: MuscleGroup[]): string {
+  if (muscles.length === 0) return 'Training'
+  const upper = new Set<MuscleGroup>(['chest', 'back', 'shoulders', 'arms'])
+  const allUpper = muscles.every((m) => upper.has(m))
+  const allLegs = muscles.every((m) => m === 'legs' || m === 'core')
+  if (allUpper && !muscles.includes('legs')) return 'Upper body'
+  if (allLegs) return 'Lower body'
+  if (muscles.includes('cardio')) return 'Cardio'
+  if (muscles.includes('full')) return 'Full body'
+  return MUSCLE_LABELS[muscles[0]]
+}
+
+function estKcal(durationMin: number): number {
+  return Math.max(0, Math.round(durationMin * 7.5))
+}
 
 export function DashboardPage() {
   const { user, goals, preferences } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
+  const firstName = user?.name.split(' ')[0] ?? 'there'
 
   const workouts = useLiveQuery(
     () => (user?.id ? db.workouts.where('userId').equals(user.id).toArray() : []),
+    [user?.id],
+  )
+
+  const waterLogs = useLiveQuery(
+    () => (user?.id ? db.waterLogs.where('userId').equals(user.id).toArray() : []),
     [user?.id],
   )
 
@@ -38,12 +101,15 @@ export function DashboardPage() {
   })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  const thisWeek = (workouts ?? []).filter((w) => {
+  const workoutList = workouts ?? []
+  const workoutDates = new Set(workoutList.map((w) => w.date))
+
+  const thisWeek = workoutList.filter((w) => {
     const d = parseISO(w.date)
     return d >= weekStart && d < addDays(weekStart, 7)
   })
 
-  const todayWorkout = (workouts ?? []).find((w) => w.date === today)
+  const todayWorkout = workoutList.find((w) => w.date === today)
   const calendarWeekday = new Date().getDay() as Weekday
   const planWeekdayForToday =
     user?.id != null
@@ -52,406 +118,308 @@ export function DashboardPage() {
   const todayPlan = activePlan
     ? getPlanDayForWeekday(activePlan.days, planWeekdayForToday)
     : undefined
-  const planDayOverridden =
-    user?.id != null &&
-    readLogPlanWeekdayOverride(user.id, today) != null &&
-    planWeekdayForToday !== calendarWeekday
+
   const weeklyGoal = positiveOrDefault(goals?.weeklyWorkouts, DEFAULT_WEEKLY_WORKOUTS)
-  const progress = Math.min(1, thisWeek.length / weeklyGoal)
 
   const streak = (() => {
     let count = 0
     let cursor = new Date()
-    const dates = new Set((workouts ?? []).map((w) => w.date))
-    if (!dates.has(format(cursor, 'yyyy-MM-dd'))) {
-      cursor = subDays(cursor, 1)
-    }
-    while (dates.has(format(cursor, 'yyyy-MM-dd'))) {
+    if (!workoutDates.has(format(cursor, 'yyyy-MM-dd'))) cursor = subDays(cursor, 1)
+    while (workoutDates.has(format(cursor, 'yyyy-MM-dd'))) {
       count++
       cursor = subDays(cursor, 1)
     }
     return count
   })()
 
-  const recent = [...(workouts ?? [])]
-    .sort((a, b) => b.date.localeCompare(a.date))
+  const nextMilestone = streak > 0 ? Math.ceil(streak / 7) * 7 : 7
+  const daysToMilestone = Math.max(0, nextMilestone - streak)
+
+  const goalMl = goals?.dailyWaterMl && goals.dailyWaterMl > 0 ? goals.dailyWaterMl : DEFAULT_WATER_GOAL_ML
+  const todayWater = (waterLogs ?? [])
+    .filter((l) => l.date === today)
+    .reduce((s, l) => s + l.amountMl, 0)
+  const waterPct = Math.round(waterProgress(todayWater, goalMl) * 100)
+
+  const last3WaterDays = [2, 1, 0].map((i) => {
+    const d = subDays(new Date(), i)
+    const key = format(d, 'yyyy-MM-dd')
+    const ml = (waterLogs ?? []).filter((l) => l.date === key).reduce((s, l) => s + l.amountMl, 0)
+    return { key, label: format(d, 'MMM d'), ml }
+  })
+  const maxWater3 = Math.max(goalMl, ...last3WaterDays.map((d) => d.ml), 1)
+
+  const recentWorkouts = [...workoutList]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 3)
+
+  async function quickAddWater(ml: number) {
+    if (!user?.id) return
+    await db.waterLogs.add({
+      userId: user.id,
+      date: today,
+      amountMl: ml,
+      createdAt: new Date().toISOString(),
+    })
+  }
 
   const logHref =
     todayPlan && todayPlan.muscles.length > 0 ? '/log?fromPlan=1' : '/log'
-  const logTitle =
+
+  const focusMusclesList: MuscleGroup[] = (() => {
+    if (todayWorkout?.exercises.length) {
+      return [...new Set(todayWorkout.exercises.map((e) => e.muscle))] as MuscleGroup[]
+    }
+    return todayPlan?.muscles ?? []
+  })()
+
+  const focusTitle = todayWorkout?.title ?? (
     todayPlan && todayPlan.muscles.length > 0
       ? todayPlan.title
-      : `Workout — ${format(new Date(), 'MMM d')}`
+      : 'Strength & muscle growth'
+  )
 
-  function renderPlanPanelDesktop() {
-    if (!activePlan || !todayPlan) return null
+  const focusMusclesText: string = (() => {
+    if (focusMusclesList.length) {
+      return focusMusclesList.map((g) => MUSCLE_LABELS[g]).join(' · ')
+    }
+    return 'Pick exercises in Log'
+  })()
 
-    return (
-      <section
-        className="glass animate-fade-up hidden rounded-[var(--radius)] p-4 lg:block"
-        style={{ animationDelay: '70ms' }}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
-            {activePlan.name} · {WEEKDAY_LABELS[planWeekdayForToday]}
-            {planDayOverridden ? ' · your pick' : ''}
-          </p>
-          <Link to="/plans" className="shrink-0 text-xs font-bold text-[var(--ink-muted)]">
-            Change
-          </Link>
-        </div>
-        <h2 className="mt-1 font-display text-2xl font-bold">
-          {todayPlan.muscles.length === 0 ? 'Rest day' : todayPlan.title}
-        </h2>
-        {todayPlan.muscles.length > 0 && (
-          <>
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              {todayPlan.muscles.map((m) => MUSCLE_LABELS[m]).join(' · ')} ·{' '}
-              {todayPlan.exerciseNames.length} exercises
-            </p>
-            {!todayWorkout && (
-              <div className="mt-4 grid gap-2">
-                <Link to="/log?fromPlan=1" className="btn btn-accent w-full py-2 text-sm">
-                  <Plus size={16} />
-                  Load plan day
-                </Link>
-                <Link to="/log" className="btn btn-secondary w-full py-2 text-sm">
-                  Custom workout
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-    )
-  }
+  const focusRegion = focusRegionLabel(focusMusclesList)
 
-  const firstName = user?.name.split(' ')[0] ?? 'there'
-  const needsWorkoutLog = !todayWorkout
-  const weekNeedsWork = thisWeek.length < weeklyGoal
-  const todayNeedsWorkout =
-    needsWorkoutLog && (!todayPlan || todayPlan.muscles.length > 0)
+  const focusImage = (() => {
+    const ex = todayWorkout?.exercises[0]
+    if (ex) return { muscle: ex.muscle, imageKey: ex.imageKey }
+    const muscle = focusMusclesList[0] ?? 'chest'
+    const name = todayPlan?.exerciseNames[0]
+    return {
+      muscle,
+      imageKey: name ? imageKeyForExercise(name, muscle) : imageKeyForExercise('Barbell Bench Press', 'chest'),
+    }
+  })()
+
+  const checklist = [
+    { label: 'Complete workout', done: Boolean(todayWorkout) },
+    { label: `Drink ${formatWater(goalMl)} water`, done: todayWater >= goalMl },
+    { label: 'Maintain protein intake', done: false },
+  ]
 
   return (
-    <div className="space-y-3 sm:space-y-5 lg:space-y-6">
-      {/* Mobile: single-screen summary tiles */}
-      <div className="flex flex-col gap-2 lg:hidden">
-        <header className="flex items-center justify-between gap-2 px-0.5">
-          <h1 className="font-display dash-mobile-body text-base">Hey, {firstName}</h1>
-          <div className="dash-mobile-meta flex shrink-0 items-center gap-2">
-            <span>{format(new Date(), 'MMM d')}</span>
-            <span className="inline-flex items-center gap-0.5 font-bold text-[var(--accent)]">
-              <Flame size={12} />
-              {streak}
-            </span>
+    <div className="home-premium mx-auto flex max-w-lg flex-col lg:max-w-xl">
+      <header className="home-premium-header flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="home-avatar" aria-hidden>
+            {user?.name ? initials(user.name) : '?'}
           </div>
-        </header>
-
-        <section
-          className={`glass dash-mobile-tile ${weekNeedsWork && needsWorkoutLog ? 'dash-mobile-tile--accent-focus' : ''}`}
-        >
-          <p className="dash-mobile-label">Weekly goal</p>
-          <div className="mt-1 flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]">
-              <CalendarDays size={16} />
-            </div>
-            <p className="min-w-0 flex-1 dash-mobile-body">
-              <span className={weekNeedsWork ? 'dash-mobile-emphasis' : ''}>
-                {thisWeek.length}/{weeklyGoal}
-              </span>
-              <span className="dash-mobile-meta font-bold"> workouts</span>
-            </p>
-            <div className="flex shrink-0 gap-0.5">
-              {weekDays.map((d) => {
-                const key = format(d, 'yyyy-MM-dd')
-                const hit = thisWeek.some((w) => w.date === key)
-                const isToday = isSameDay(d, new Date())
-                return (
-                  <div
-                    key={key}
-                    title={key}
-                    className={`dash-mobile-chip flex h-5 w-5 items-center justify-center rounded ${
-                      hit
-                        ? 'bg-[var(--brand)] text-white'
-                        : isToday
-                          ? 'bg-[var(--brand-soft)] text-[var(--brand)] ring-1 ring-[var(--brand)]'
-                          : 'border border-[var(--line)] bg-white text-[var(--ink-muted)]'
-                    }`}
-                  >
-                    {format(d, 'EEEEE')}
-                  </div>
-                )
-              })}
-            </div>
+          <div className="min-w-0">
+            <h1 className="home-premium-title truncate">
+              {greeting()}, {firstName} 👋
+            </h1>
+            <p className="home-premium-sub">{goals?.focus || 'Stay consistent, stronger every day'}</p>
           </div>
-        </section>
-
-        <section
-          className={`glass dash-mobile-tile ${todayNeedsWorkout ? 'dash-mobile-tile--focus' : todayWorkout ? 'dash-mobile-tile--done' : ''}`}
-        >
-          <p className="dash-mobile-label">{todayWorkout ? 'Logged today' : 'Today’s focus'}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]">
-              <Dumbbell size={16} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p
-                className={`truncate dash-mobile-body ${todayNeedsWorkout ? 'dash-mobile-emphasis' : ''}`}
-              >
-                {todayWorkout?.title ?? logTitle}
-              </p>
-              {todayWorkout ? (
-                <p className="dash-mobile-meta">
-                  {todayWorkout.durationMin} min · {todayWorkout.exercises.length} exercises
-                </p>
-              ) : activePlan && todayPlan ? (
-                <p className="truncate dash-mobile-meta">
-                  {activePlan.name} ·{' '}
-                  {todayPlan.muscles.length === 0 ? 'Rest day' : todayPlan.title}
-                </p>
-              ) : (
-                <p className="dash-mobile-meta">Tap Log to start your session</p>
-              )}
-            </div>
-            {todayWorkout ? (
-              <Link
-                to={`/history/${todayWorkout.id}`}
-                className="btn btn-secondary dash-mobile-action shrink-0"
-              >
-                View
-              </Link>
-            ) : (
-              <div className="flex shrink-0 gap-1">
-                <Link to={logHref} className="btn btn-primary dash-mobile-action">
-                  Log
-                </Link>
-                {activePlan && todayPlan && todayPlan.muscles.length > 0 && (
-                  <Link to="/log" className="btn btn-secondary dash-mobile-action">
-                    Custom
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {!activePlan && (
-          <Link to="/plans" className="glass dash-mobile-tile dash-mobile-tile--focus flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]">
-              <CalendarDays size={16} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="dash-mobile-label">Plan</p>
-              <p className="dash-mobile-body dash-mobile-emphasis">Set up a weekly plan</p>
-            </div>
-            <span className="btn btn-primary dash-mobile-action shrink-0">Plans</span>
-          </Link>
-        )}
-
-        <WaterQuickCard minimal highlight={needsWorkoutLog} />
-
-        {recent.length > 0 && (
-          <Link
-            to="/history"
-            className="glass dash-mobile-tile flex items-center justify-center gap-1.5 py-2 dash-mobile-meta font-bold text-[var(--brand)]"
-          >
-            <History size={14} />
-            History · {recent.length} recent
-          </Link>
-        )}
-      </div>
-
-      <header className="animate-fade-up hidden items-end justify-between gap-4 lg:flex">
-        <div>
-          <h1 className="page-title">Hey, {user?.name.split(' ')[0]}</h1>
-          <p className="page-subtitle">
-            {goals?.focus || 'Stay consistent'} · {streak} day streak
-          </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-sm font-extrabold text-[var(--accent)]">
-          <Flame size={16} />
-          {streak} day{streak === 1 ? '' : 's'}
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" className="home-icon-btn" aria-label="Notifications">
+            <Bell size={17} />
+          </button>
+          <ThemeToggle />
+          <Link to="/settings" className="home-icon-btn" aria-label="Settings">
+            <Settings size={17} />
+          </Link>
         </div>
       </header>
 
-      <div className="desktop-grid desktop-grid--2 hidden lg:grid lg:gap-5">
-        <div className="flex flex-col gap-3 sm:gap-5">
-          <section
-            className="glass animate-fade-up rounded-[var(--radius)] p-3 shadow-[var(--shadow)] sm:p-5"
-            style={{ animationDelay: '50ms' }}
-          >
-            <div className="flex items-center gap-3 sm:gap-5">
-              <div className="shrink-0 sm:hidden">
-                <ProgressRing
-                  value={progress}
-                  size={72}
-                  stroke={8}
-                  label={`${thisWeek.length}/${weeklyGoal}`}
-                  sublabel="week"
-                />
-              </div>
-              <div className="hidden shrink-0 sm:block">
-                <ProgressRing
-                  value={progress}
-                  size={120}
-                  label={`${thisWeek.length}/${weeklyGoal}`}
-                  sublabel="this week"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-base font-bold sm:text-xl">Weekly goal</p>
-                <p className="mt-0.5 text-xs text-[var(--ink-muted)] sm:mt-1 sm:text-sm">
-                  {goals?.focus || 'Stay consistent'}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1 sm:mt-4 sm:gap-1.5">
-                  {weekDays.map((d) => {
-                    const key = format(d, 'yyyy-MM-dd')
-                    const hit = thisWeek.some((w) => w.date === key)
-                    const isToday = isSameDay(d, new Date())
-                    return (
-                      <div
-                        key={key}
-                        title={key}
-                        className={`flex h-7 w-7 flex-col items-center justify-center rounded-md text-[0.6rem] font-bold sm:h-9 sm:w-9 sm:rounded-lg sm:text-[0.65rem] ${
-                          hit
-                            ? 'bg-[var(--brand)] text-white'
-                            : isToday
-                              ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                              : 'bg-white text-[var(--ink-muted)] border border-[var(--line)]'
-                        }`}
-                      >
-                        {format(d, 'EEEEE')}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="animate-fade-up" style={{ animationDelay: '100ms' }}>
-            {todayWorkout ? (
-              <div className="glass rounded-[var(--radius)] p-3 sm:p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--brand)]">
-                      Today’s session
-                    </p>
-                    <h2 className="mt-0.5 truncate font-display text-lg font-bold sm:mt-1 sm:text-2xl">
-                      {todayWorkout.title}
-                    </h2>
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--ink-muted)] sm:mt-1 sm:text-sm">
-                      <Timer size={14} />
-                      {todayWorkout.durationMin} min · {todayWorkout.exercises.length} exercises
-                    </p>
-                  </div>
-                  <Link
-                    to={`/history/${todayWorkout.id}`}
-                    className="btn btn-secondary shrink-0 px-2.5 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm"
-                  >
-                    View
-                  </Link>
-                </div>
-                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 sm:mt-4 sm:gap-2">
-                  {todayWorkout.exercises.slice(0, 6).map((ex) => (
-                    <div key={`${ex.exerciseId}-${ex.exerciseName}`} className="shrink-0">
-                      <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <Link
-                to={logHref}
-                className="group relative flex overflow-hidden rounded-[var(--radius)] bg-[var(--brand)] p-4 text-white shadow-[var(--shadow)] sm:min-h-[12rem] sm:p-6 lg:min-h-[14rem]"
-              >
-                <div className="relative z-10 min-w-0 flex-1">
-                  <p className="text-xs font-bold text-teal-100 sm:text-sm">Ready when you are</p>
-                  <h2 className="mt-0.5 font-display text-lg font-extrabold leading-snug sm:mt-1 sm:text-2xl lg:text-3xl">
-                    Log {logTitle}
-                  </h2>
-                  <p className="mt-1 hidden text-sm text-teal-50/90 sm:block sm:max-w-xs">
-                    Track sets, reps, and weight — works fully offline.
-                  </p>
-                  <span className="btn mt-3 bg-white px-3 py-2 text-sm text-[var(--brand)] sm:mt-5">
-                    <Plus size={16} />
-                    Start logging
-                  </span>
-                </div>
-                <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10 sm:-right-6 sm:-top-6 sm:h-40 sm:w-40" />
-              </Link>
-            )}
-          </section>
-
-          {recent.length > 0 && (
-            <section className="animate-fade-up space-y-2 sm:space-y-3" style={{ animationDelay: '150ms' }}>
-              <div className="flex items-center justify-between">
-                <h2 className="font-display text-base font-bold sm:text-xl">Recent</h2>
-                <Link to="/history" className="text-xs font-bold text-[var(--brand)] sm:text-sm">
-                  See all
-                </Link>
-              </div>
-              {recent.slice(0, 2).map((w, i) => (
-                <Link
-                  key={w.id}
-                  to={`/history/${w.id}`}
-                  className="glass animate-slide-in flex items-center gap-2.5 rounded-xl p-2.5 sm:gap-3 sm:rounded-2xl sm:p-3"
-                  style={{ animationDelay: `${i * 40}ms` }}
+      <section className="home-card">
+        <Link to="/history" className="home-card-head-link">
+          <span className="home-card-head-left">
+            <span className="home-card-icon home-card-icon--accent">
+              <Flame size={18} />
+            </span>
+            <span className="home-card-head-title">Weekly streak</span>
+          </span>
+          <ChevronRight size={18} className="home-card-head-chevron" />
+        </Link>
+        <p className="home-card-stat mt-2">
+          {streak} <span className="home-card-stat-unit">days</span>
+        </p>
+        <p className="home-card-hint">
+          {daysToMilestone > 0
+            ? `Keep going! ${daysToMilestone} more day${daysToMilestone === 1 ? '' : 's'} to reach your next milestone.`
+            : `${thisWeek.length}/${weeklyGoal} workouts logged this week.`}
+        </p>
+        <div className="home-week-row">
+          {weekDays.map((d) => {
+            const key = format(d, 'yyyy-MM-dd')
+            const hit = workoutDates.has(key)
+            const isToday = isSameDay(d, new Date())
+            return (
+              <div key={key} className="home-week-cell" title={format(d, 'EEE, MMM d')}>
+                <span className="home-week-label">{format(d, 'EEE').slice(0, 3)}</span>
+                <span
+                  className={`home-week-dot ${hit ? 'home-week-dot--done' : ''} ${isToday ? 'home-week-dot--today' : ''}`}
                 >
-                  {w.exercises[0] ? (
-                    <ExerciseImage
-                      imageKey={w.exercises[0].imageKey}
-                      muscle={w.exercises[0].muscle}
-                      size="sm"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)] sm:h-12 sm:w-12 sm:rounded-2xl">
-                      <Timer size={18} />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1 text-left">
-                    <p className="truncate text-sm font-bold sm:text-base">{w.title}</p>
-                    <p className="text-[0.65rem] text-[var(--ink-muted)] sm:text-xs">
-                      {format(parseISO(w.date), 'MMM d')} · {w.durationMin} min
-                      {w.exercises[0] && ` · ${MUSCLE_LABELS[w.exercises[0].muscle]}`}
-                    </p>
-                  </div>
-                </Link>
+                  {hit ? <Check size={11} strokeWidth={3} /> : null}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="home-card">
+        <div className="home-water-grid">
+          <div className="min-w-0">
+            <Link to="/water" className="home-card-head-link mb-2">
+              <span className="home-card-head-left">
+                <Droplets size={17} className="text-[var(--home-blue)]" />
+                <span className="home-card-head-title">Water intake</span>
+              </span>
+              <ChevronRight size={18} className="home-card-head-chevron" />
+            </Link>
+            <p className="home-card-stat home-card-stat--sm">
+              {litersCompact(todayWater)} / {litersCompact(goalMl)} L
+            </p>
+            <p className="home-card-hint">{waterPct}% of daily goal</p>
+            <div className="home-progress mt-2.5">
+              <div className="home-progress-fill" style={{ width: `${Math.max(waterPct, 3)}%` }} />
+            </div>
+            <button
+              type="button"
+              className="home-water-add mt-3 w-full"
+              onClick={() => quickAddWater(250)}
+            >
+              <Plus size={17} strokeWidth={2.5} /> Add water
+            </button>
+          </div>
+          <div className="home-water-chart">
+            <p className="home-chart-title">Last 3 days</p>
+            <div className="home-water-bars">
+              {last3WaterDays.map((row) => (
+                <div key={row.key} className="home-water-bar-col">
+                  <span className="home-water-bar-value">{litersCompact(row.ml)}L</span>
+                  <div
+                    className="home-water-bar"
+                    style={{ height: `${Math.max(10, (row.ml / maxWater3) * 100)}%` }}
+                    title={formatWater(row.ml)}
+                  />
+                  <span className="home-water-bar-label">{row.label}</span>
+                </div>
               ))}
-              {recent.length > 2 && (
-                <Link to="/history" className="block text-center text-xs font-bold text-[var(--brand)] sm:hidden">
-                  +{recent.length - 2} more in history
-                </Link>
-              )}
-            </section>
-          )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="home-card home-card--focus">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Target size={17} className="text-[var(--home-red)]" />
+            <span className="home-card-head-title">Today&apos;s focus</span>
+          </div>
+          <span className="home-date-badge">
+            <Calendar size={12} />
+            {format(new Date(), 'EEE, MMM d, yyyy')}
+          </span>
         </div>
 
-        <div className="desktop-grid--stack-right hidden flex-col gap-3 sm:gap-5 lg:flex">
-          <WaterQuickCard />
-
-          {!activePlan && (
-            <Link
-              to="/plans"
-              className="glass animate-fade-up flex items-center gap-3 rounded-[var(--radius)] p-4"
-              style={{ animationDelay: '70ms' }}
-            >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
-                <CalendarDays size={22} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold">Choose a weekly plan</p>
-                <p className="text-xs text-[var(--ink-muted)]">
-                  Bro split, PPL, or assign parts to each day yourself
-                </p>
-              </div>
+        <div className="home-focus-panel mt-3">
+          <div className="home-focus-thumb">
+            <ExerciseImage
+              muscle={focusImage.muscle}
+              imageKey={focusImage.imageKey}
+              size="sm"
+              className="h-full w-full"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="home-focus-tag">{focusRegion}</span>
+            <p className="home-focus-title">{focusTitle}</p>
+            <p className="home-card-hint mt-0.5">{focusMusclesText}</p>
+          </div>
+          {todayWorkout ? (
+            <Link to={`/history/${todayWorkout.id}`} className="home-start-btn">
+              View <ChevronRight size={16} />
+            </Link>
+          ) : (
+            <Link to={logHref} className="home-start-btn">
+              Start <ChevronRight size={16} />
             </Link>
           )}
-
-          {renderPlanPanelDesktop()}
         </div>
-      </div>
+
+        <ul className="home-checklist-row mt-3">
+          {checklist.map((item) => (
+            <li key={item.label} className="home-checklist-chip">
+              <span className={`home-check ${item.done ? 'home-check--done' : ''}`}>
+                {item.done ? <Check size={10} strokeWidth={3} /> : null}
+              </span>
+              <span className="truncate">{item.label}</span>
+            </li>
+          ))}
+        </ul>
+        {!todayWorkout && !activePlan && (
+          <Link to="/plans" className="home-inline-link mt-2 inline-block">
+            Set up a weekly plan →
+          </Link>
+        )}
+      </section>
+
+      {recentWorkouts.length > 0 && (
+        <section className="home-card home-card--history">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Dumbbell size={16} className="shrink-0 text-[var(--home-muted)]" />
+              <span className="home-card-head-title truncate">Last 3 days workout summary</span>
+            </div>
+            <Link to="/history" className="home-view-all">
+              View all <ChevronRight size={14} />
+            </Link>
+          </div>
+          <ul className="home-workout-list mt-2">
+            {recentWorkouts.map((w) => {
+              const d = parseISO(w.date)
+              const muscle = primaryMuscle(w) ?? w.exercises[0]?.muscle ?? 'full'
+              const imageKey =
+                w.exercises[0]?.imageKey ??
+                imageKeyForExercise(w.exercises[0]?.exerciseName ?? 'Workout', muscle)
+              return (
+                <li key={w.id}>
+                  <Link to={`/history/${w.id}`} className="home-workout-row">
+                    <div className="home-workout-date">
+                      <span className="home-workout-date-main">{format(d, 'MMM d')}</span>
+                      <span className="home-workout-date-sub">{format(d, 'EEE')}</span>
+                    </div>
+                    <div className="home-workout-thumb">
+                      <ExerciseImage
+                        muscle={muscle}
+                        imageKey={imageKey}
+                        size="sm"
+                        className="h-full w-full"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="home-workout-title truncate">{w.title}</p>
+                      <p className="home-workout-meta">
+                        <Clock3 size={11} />
+                        {w.durationMin} min
+                        <span className="home-workout-meta-sep" />
+                        <Dumbbell size={11} />
+                        {w.exercises.length} exercises
+                        <span className="home-workout-meta-sep" />
+                        <Flame size={11} />
+                        {estKcal(w.durationMin)} kcal
+                      </p>
+                    </div>
+                    <span className="home-badge-done">Completed</span>
+                    <ChevronRight size={16} className="home-row-chevron shrink-0" />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }

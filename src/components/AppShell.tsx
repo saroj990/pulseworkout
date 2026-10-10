@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
 import { Check, Droplets, Dumbbell, History, Home, Settings } from 'lucide-react'
@@ -6,6 +6,7 @@ import { OfflineBadge } from './OfflineBadge'
 import { OldDataAlertModal } from './OldDataAlertModal'
 import { ProfileMenu } from './ProfileMenu'
 import { useAuth } from '../context/AuthContext'
+import { resolveColorTheme } from '../lib/theme'
 import { db } from '../db'
 
 const links = [
@@ -94,7 +95,10 @@ function NavItems({
 }
 
 export function AppShell() {
-  const { user } = useAuth()
+  const { user, preferences } = useAuth()
+  const location = useLocation()
+  const hideMobileTopbar = location.pathname === '/'
+  const isDark = resolveColorTheme(preferences?.colorTheme) === 'dark'
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const loggedToday = useLiveQuery(async () => {
@@ -137,7 +141,7 @@ export function AppShell() {
       </aside>
 
       <div className="app-content">
-        <header className="app-topbar glass">
+        <header className={`app-topbar glass ${hideMobileTopbar ? 'hidden lg:block' : ''}`}>
           <div className="topbar-inner">
             <div className="min-w-0">
               <p className="font-display text-lg font-extrabold text-[var(--brand)] lg:hidden">Pulse</p>
@@ -165,7 +169,9 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="app-main">
+        <main
+          className={`app-main ${hideMobileTopbar ? 'app-main--home' : ''} ${hideMobileTopbar && isDark ? 'app-main--home-dark' : ''}`}
+        >
           <div className="page-frame">
             <Outlet />
           </div>

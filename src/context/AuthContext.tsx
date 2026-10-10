@@ -21,6 +21,7 @@ import {
   DEFAULT_REST_SECONDS,
   DEFAULT_WEEKLY_WORKOUTS,
 } from '../data/goals'
+import { applyDocumentTheme, cacheColorTheme, resolveColorTheme } from '../lib/theme'
 
 interface AuthContextValue {
   user: User | null
@@ -102,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u)
     setPreferences(prefs ?? null)
     setGoals(g ?? null)
+    const theme = resolveColorTheme(prefs?.colorTheme)
+    applyDocumentTheme(theme)
+    cacheColorTheme(theme)
   }, [])
 
   useEffect(() => {

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays, Cloud, FileSpreadsheet, LogOut, Target, Trash2 } from 'lucide-react'
+import { CalendarDays, Cloud, FileSpreadsheet, LogOut, Palette, Target, Trash2 } from 'lucide-react'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../db'
 import { exportToExcel, syncToGoogleDrive } from '../lib/sync'
@@ -125,6 +126,17 @@ export function SettingsPage() {
         <Link to="/goals" className="btn btn-secondary mt-3 w-full">
           <Target size={16} /> Edit goals
         </Link>
+      </section>
+
+      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '85ms' }}>
+        <div className="flex items-center gap-2">
+          <Palette size={18} className="text-[var(--brand)]" />
+          <h2 className="font-display text-lg font-bold">Appearance</h2>
+        </div>
+        <p className="text-sm text-[var(--ink-muted)]">
+          Switch between light and dark across the app, including the home dashboard.
+        </p>
+        <ThemeToggle variant="segmented" />
       </section>
 
       <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '90ms' }}>

@@ -25,6 +25,8 @@ export interface User {
   createdAt: string
 }
 
+export type ColorTheme = 'light' | 'dark'
+
 export interface Preferences {
   id?: number
   userId: number
@@ -34,6 +36,8 @@ export interface Preferences {
   preferredMuscles: MuscleGroup[]
   googleClientId: string
   onboardingDone: boolean
+  /** App-wide light or dark appearance. */
+  colorTheme?: ColorTheme
   pinEnabled?: boolean
   pinHash?: string
   pinSalt?: string
