@@ -40,8 +40,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+async function dedupeBuiltInExercises() {
+  const existing = await db.exercises.filter((e) => !e.isCustom).toArray()
+  const keepName = new Map<string, number>()
+  const deleteIds: number[] = []
+  for (const row of existing.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))) {
+    if (row.id == null) continue
+    const key = row.name.trim().toLowerCase()
+    if (keepName.has(key)) deleteIds.push(row.id)
+    else keepName.set(key, row.id)
+  }
+  if (deleteIds.length > 0) await db.exercises.bulkDelete(deleteIds)
+}
+
 async function ensureSeedExercises() {
   const allSeed = [...SEED_EXERCISES, ...EXTRA_EXERCISES]
+  await dedupeBuiltInExercises()
   const existing = await db.exercises.filter((e) => !e.isCustom).toArray()
   if (existing.length === 0) {
     await db.exercises.bulkAdd(allSeed)
