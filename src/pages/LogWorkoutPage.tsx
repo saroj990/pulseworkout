@@ -1222,7 +1222,9 @@ export function LogWorkoutPage() {
         )}
 
         {!session && logStep === 'template' && (
-          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-4 max-h-[min(70dvh,32rem)] overflow-y-auto overscroll-contain">
+          <>
+          <section className="glass animate-fade-up flex min-h-0 flex-col overflow-hidden rounded-[var(--radius)]">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pb-2 max-h-[min(42dvh,22rem)] sm:max-h-[min(58dvh,30rem)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[var(--brand)]" />
@@ -1376,15 +1378,18 @@ export function LogWorkoutPage() {
                 </div>
               )}
             </div>
-            <div className="grid gap-2 border-t border-[var(--line)] pt-3 sm:grid-cols-2">
-              <button type="button" className="btn btn-secondary w-full" onClick={() => setLogStep('details')}>
-                Back
-              </button>
-              <button type="button" className="btn btn-primary w-full" onClick={() => setLogStep('exercises')}>
-                Skip — pick exercises
-              </button>
             </div>
           </section>
+          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
+            <button type="button" className="btn btn-secondary w-full" onClick={() => setLogStep('details')}>
+              Back
+            </button>
+            <button type="button" className="btn btn-primary w-full" onClick={() => setLogStep('exercises')}>
+              Skip — pick exercises
+            </button>
+          </div>
+          <div className="h-[5.5rem] shrink-0 sm:hidden" aria-hidden />
+          </>
         )}
 
         {!session && logStep === 'exercises' && (
