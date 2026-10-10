@@ -463,3 +463,58 @@ select.input {
 .week-day--today {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
+
+/* Mobile home dashboard — one type scale + focus tiles */
+.dash-mobile-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.dash-mobile-body {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.dash-mobile-meta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink-muted);
+}
+
+.dash-mobile-chip {
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.dash-mobile-action {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  padding: 0.35rem 0.65rem !important;
+  line-height: 1.2;
+}
+
+.dash-mobile-tile {
+  border-radius: 0.75rem;
+  padding: 0.625rem;
+}
+
+.dash-mobile-tile--focus {
+  box-shadow: 0 0 0 2px var(--brand);
+  background: color-mix(in srgb, var(--brand-soft) 50%, white);
+}
+
+.dash-mobile-tile--accent-focus {
+  box-shadow: 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 45%, white);
+}
+
+.dash-mobile-emphasis {
+  color: var(--brand);
+  font-weight: 800;
+}

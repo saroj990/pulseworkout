@@ -8,7 +8,7 @@ import {
   startOfWeek,
   subDays,
 } from 'date-fns'
-import { CalendarDays, Flame, Plus, Timer } from 'lucide-react'
+import { CalendarDays, Dumbbell, Flame, History, Plus, Timer } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../db'
 import { ProgressRing } from '../components/ProgressRing'
@@ -84,35 +84,34 @@ export function DashboardPage() {
       ? todayPlan.title
       : `Workout — ${format(new Date(), 'MMM d')}`
 
-  function renderPlanPanel(variant: 'mobile' | 'desktop') {
+  function renderPlanPanelDesktop() {
     if (!activePlan || !todayPlan) return null
-    const compact = variant === 'mobile'
 
     return (
       <section
-        className={`glass animate-fade-up rounded-[var(--radius)] ${compact ? 'p-3 lg:hidden' : 'hidden p-4 lg:block'}`}
+        className="glass animate-fade-up hidden rounded-[var(--radius)] p-4 lg:block"
         style={{ animationDelay: '70ms' }}
       >
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-[0.65rem] font-bold uppercase tracking-wider text-[var(--brand)]">
+          <p className="truncate text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
             {activePlan.name} · {WEEKDAY_LABELS[planWeekdayForToday]}
             {planDayOverridden ? ' · your pick' : ''}
           </p>
-          <Link to="/plans" className="shrink-0 text-[0.65rem] font-bold text-[var(--ink-muted)]">
+          <Link to="/plans" className="shrink-0 text-xs font-bold text-[var(--ink-muted)]">
             Change
           </Link>
         </div>
-        <h2 className={`font-display font-bold ${compact ? 'mt-0.5 text-lg' : 'mt-1 text-2xl'}`}>
+        <h2 className="mt-1 font-display text-2xl font-bold">
           {todayPlan.muscles.length === 0 ? 'Rest day' : todayPlan.title}
         </h2>
         {todayPlan.muscles.length > 0 && (
           <>
-            <p className={`text-[var(--ink-muted)] ${compact ? 'mt-0.5 text-xs' : 'mt-1 text-sm'}`}>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {todayPlan.muscles.map((m) => MUSCLE_LABELS[m]).join(' · ')} ·{' '}
               {todayPlan.exerciseNames.length} exercises
             </p>
             {!todayWorkout && (
-              <div className={`grid gap-2 ${compact ? 'mt-2 sm:grid-cols-2' : 'mt-4'}`}>
+              <div className="mt-4 grid gap-2">
                 <Link to="/log?fromPlan=1" className="btn btn-accent w-full py-2 text-sm">
                   <Plus size={16} />
                   Load plan day
@@ -128,22 +127,140 @@ export function DashboardPage() {
     )
   }
 
+  const firstName = user?.name.split(' ')[0] ?? 'there'
+  const needsWorkoutLog = !todayWorkout
+  const weekNeedsWork = thisWeek.length < weeklyGoal
+  const todayNeedsWorkout =
+    needsWorkoutLog && (!todayPlan || todayPlan.muscles.length > 0)
+
   return (
     <div className="space-y-3 sm:space-y-5 lg:space-y-6">
-      <header className="animate-fade-up flex items-center justify-between gap-2 lg:hidden">
-        <div className="min-w-0">
-          <p className="truncate text-xs font-bold text-[var(--ink-muted)]">
-            {format(new Date(), 'EEE, MMM d')} · {goals?.focus || 'Stay consistent'}
-          </p>
-          <h1 className="font-display text-2xl font-extrabold leading-tight">
-            Hey, {user?.name.split(' ')[0]}
-          </h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--accent)]">
-          <Flame size={14} />
-          {streak}d
-        </div>
-      </header>
+      {/* Mobile: single-screen summary tiles */}
+      <div className="flex flex-col gap-2 lg:hidden">
+        <header className="flex items-center justify-between gap-2 px-0.5">
+          <h1 className="font-display dash-mobile-body text-base">Hey, {firstName}</h1>
+          <div className="dash-mobile-meta flex shrink-0 items-center gap-2">
+            <span>{format(new Date(), 'MMM d')}</span>
+            <span className="inline-flex items-center gap-0.5 font-bold text-[var(--accent)]">
+              <Flame size={12} />
+              {streak}
+            </span>
+          </div>
+        </header>
+
+        <section
+          className={`glass dash-mobile-tile ${weekNeedsWork && needsWorkoutLog ? 'dash-mobile-tile--accent-focus' : ''}`}
+        >
+          <p className="dash-mobile-label">Weekly goal</p>
+          <div className="mt-1 flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]">
+              <CalendarDays size={16} />
+            </div>
+            <p className="min-w-0 flex-1 dash-mobile-body">
+              <span className={weekNeedsWork ? 'dash-mobile-emphasis' : ''}>
+                {thisWeek.length}/{weeklyGoal}
+              </span>
+              <span className="dash-mobile-meta font-bold"> workouts</span>
+            </p>
+            <div className="flex shrink-0 gap-0.5">
+              {weekDays.map((d) => {
+                const key = format(d, 'yyyy-MM-dd')
+                const hit = thisWeek.some((w) => w.date === key)
+                const isToday = isSameDay(d, new Date())
+                return (
+                  <div
+                    key={key}
+                    title={key}
+                    className={`dash-mobile-chip flex h-5 w-5 items-center justify-center rounded ${
+                      hit
+                        ? 'bg-[var(--brand)] text-white'
+                        : isToday
+                          ? 'bg-[var(--brand-soft)] text-[var(--brand)] ring-1 ring-[var(--brand)]'
+                          : 'border border-[var(--line)] bg-white text-[var(--ink-muted)]'
+                    }`}
+                  >
+                    {format(d, 'EEEEE')}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section
+          className={`glass dash-mobile-tile ${todayNeedsWorkout ? 'dash-mobile-tile--focus' : todayWorkout ? 'dash-mobile-tile--done' : ''}`}
+        >
+          <p className="dash-mobile-label">{todayWorkout ? 'Logged today' : 'Today’s focus'}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]">
+              <Dumbbell size={16} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p
+                className={`truncate dash-mobile-body ${todayNeedsWorkout ? 'dash-mobile-emphasis' : ''}`}
+              >
+                {todayWorkout?.title ?? logTitle}
+              </p>
+              {todayWorkout ? (
+                <p className="dash-mobile-meta">
+                  {todayWorkout.durationMin} min · {todayWorkout.exercises.length} exercises
+                </p>
+              ) : activePlan && todayPlan ? (
+                <p className="truncate dash-mobile-meta">
+                  {activePlan.name} ·{' '}
+                  {todayPlan.muscles.length === 0 ? 'Rest day' : todayPlan.title}
+                </p>
+              ) : (
+                <p className="dash-mobile-meta">Tap Log to start your session</p>
+              )}
+            </div>
+            {todayWorkout ? (
+              <Link
+                to={`/history/${todayWorkout.id}`}
+                className="btn btn-secondary dash-mobile-action shrink-0"
+              >
+                View
+              </Link>
+            ) : (
+              <div className="flex shrink-0 gap-1">
+                <Link to={logHref} className="btn btn-primary dash-mobile-action">
+                  Log
+                </Link>
+                {activePlan && todayPlan && todayPlan.muscles.length > 0 && (
+                  <Link to="/log" className="btn btn-secondary dash-mobile-action">
+                    Custom
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {!activePlan && (
+          <Link to="/plans" className="glass dash-mobile-tile dash-mobile-tile--focus flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]">
+              <CalendarDays size={16} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="dash-mobile-label">Plan</p>
+              <p className="dash-mobile-body dash-mobile-emphasis">Set up a weekly plan</p>
+            </div>
+            <span className="btn btn-primary dash-mobile-action shrink-0">Plans</span>
+          </Link>
+        )}
+
+        <WaterQuickCard minimal highlight={needsWorkoutLog} />
+
+        {recent.length > 0 && (
+          <Link
+            to="/history"
+            className="glass dash-mobile-tile flex items-center justify-center gap-1.5 py-2 dash-mobile-meta font-bold text-[var(--brand)]"
+          >
+            <History size={14} />
+            History · {recent.length} recent
+          </Link>
+        )}
+      </div>
 
       <header className="animate-fade-up hidden items-end justify-between gap-4 lg:flex">
         <div>
@@ -158,7 +275,7 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <div className="desktop-grid desktop-grid--2 lg:gap-5">
+      <div className="desktop-grid desktop-grid--2 hidden lg:grid lg:gap-5">
         <div className="flex flex-col gap-3 sm:gap-5">
           <section
             className="glass animate-fade-up rounded-[var(--radius)] p-3 shadow-[var(--shadow)] sm:p-5"
@@ -213,8 +330,6 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {renderPlanPanel('mobile')}
-
           <section className="animate-fade-up" style={{ animationDelay: '100ms' }}>
             {todayWorkout ? (
               <div className="glass rounded-[var(--radius)] p-3 sm:p-5">
@@ -268,10 +383,6 @@ export function DashboardPage() {
               </Link>
             )}
           </section>
-
-          <div className="lg:hidden">
-            <WaterQuickCard compact />
-          </div>
 
           {recent.length > 0 && (
             <section className="animate-fade-up space-y-2 sm:space-y-3" style={{ animationDelay: '150ms' }}>
@@ -338,25 +449,9 @@ export function DashboardPage() {
             </Link>
           )}
 
-          {renderPlanPanel('desktop')}
+          {renderPlanPanelDesktop()}
         </div>
       </div>
-
-      {!activePlan && (
-        <Link
-          to="/plans"
-          className="glass animate-fade-up flex items-center gap-3 rounded-[var(--radius)] p-3 lg:hidden"
-          style={{ animationDelay: '70ms' }}
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
-            <CalendarDays size={20} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Choose a weekly plan</p>
-            <p className="text-xs text-[var(--ink-muted)]">Bro split, PPL, or custom days</p>
-          </div>
-        </Link>
-      )}
     </div>
   )
 }

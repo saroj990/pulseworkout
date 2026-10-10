@@ -237,7 +237,16 @@ export function WaterPage() {
 }
 
 /** Compact widget used on the dashboard */
-export function WaterQuickCard({ compact = false }: { compact?: boolean }) {
+export function WaterQuickCard({
+  compact = false,
+  minimal = false,
+  highlight = false,
+}: {
+  compact?: boolean
+  minimal?: boolean
+  /** Subtle focus ring when another primary task (e.g. log) is still open */
+  highlight?: boolean
+}) {
   const { user, goals } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
   const goalMl = goals?.dailyWaterMl && goals.dailyWaterMl > 0 ? goals.dailyWaterMl : DEFAULT_WATER_GOAL_ML
@@ -263,6 +272,54 @@ export function WaterQuickCard({ compact = false }: { compact?: boolean }) {
       amountMl: ml,
       createdAt: new Date().toISOString(),
     })
+  }
+
+  if (minimal) {
+    const behindOnWater = total < goalMl
+    return (
+      <section
+        className={`glass animate-fade-up dash-mobile-tile ${behindOnWater && !highlight ? 'dash-mobile-tile--accent-focus' : ''}`}
+        style={{ animationDelay: '85ms' }}
+      >
+        <p className="dash-mobile-label text-sky-800">Water</p>
+        <div className="mt-1 flex items-center gap-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
+            <Droplets size={16} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="dash-mobile-body leading-tight">
+              {formatWater(total)}
+              <span className="dash-mobile-meta font-bold"> / {formatWater(goalMl)}</span>
+            </p>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full border border-[var(--line)] bg-white">
+              <div
+                className="h-full rounded-full bg-sky-500 transition-all"
+                style={{ width: `${progress * 100}%` }}
+              />
+            </div>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <button
+              type="button"
+              className="dash-mobile-action rounded-lg border border-[var(--line)] bg-white"
+              onClick={() => quickAdd(250)}
+            >
+              +250
+            </button>
+            <button
+              type="button"
+              className="dash-mobile-action rounded-lg border border-[var(--line)] bg-white"
+              onClick={() => quickAdd(500)}
+            >
+              +500
+            </button>
+            <Link to="/water" className="dash-mobile-action rounded-lg bg-[var(--brand)] text-white">
+              ···
+            </Link>
+          </div>
+        </div>
+      </section>
+    )
   }
 
   return (
