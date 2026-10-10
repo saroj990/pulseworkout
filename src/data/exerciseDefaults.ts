@@ -1,3 +1,5 @@
+import { resolveExerciseName } from './exerciseLibrary'
+
 /** Reasonable default sets for known exercises. Weights are in kg. */
 export type ExerciseDefault = {
   reps: number
@@ -85,7 +87,8 @@ export function getExerciseDefault(
   muscle: string,
   units: 'kg' | 'lbs' = 'kg',
 ): ExerciseDefault {
-  const base = EXERCISE_DEFAULTS[name] ?? FALLBACK_BY_MUSCLE[muscle] ?? {
+  const canonical = resolveExerciseName(name)
+  const base = EXERCISE_DEFAULTS[canonical] ?? EXERCISE_DEFAULTS[name] ?? FALLBACK_BY_MUSCLE[muscle] ?? {
     reps: 10,
     weightKg: 20,
     sets: 3,

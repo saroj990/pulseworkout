@@ -1,11 +1,11 @@
-import type { Exercise, MuscleGroup } from '../db'
+import type { MuscleGroup } from '../db'
 import {
   CARDIO_EXERCISE_NAMES,
   CARDIO_PLAN_DAY_A,
   CARDIO_PLAN_DAY_B,
   CARDIO_PLAN_DAY_C,
-  CARDIO_SEED_EXERCISES,
 } from './cardioExercises'
+import { exerciseNamesForMuscle } from './exerciseLibrary'
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6 // Sun–Sat
 
@@ -38,31 +38,17 @@ export const WEEKDAY_FULL = [
 ] as const
 
 /** Default workout for each body part */
+function partDay(muscle: MuscleGroup, title: string, count = 6): { title: string; exerciseNames: string[] } {
+  return { title, exerciseNames: exerciseNamesForMuscle(muscle).slice(0, count) }
+}
+
 export const PART_WORKOUTS: Record<MuscleGroup, { title: string; exerciseNames: string[] }> = {
-  chest: {
-    title: 'Chest Day',
-    exerciseNames: ['Barbell Bench Press', 'Incline Dumbbell Press', 'Push-Up', 'Dumbbell Fly', 'Cable Crossover'],
-  },
-  back: {
-    title: 'Back Day',
-    exerciseNames: ['Pull-Up', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Face Pull'],
-  },
-  shoulders: {
-    title: 'Shoulder Day',
-    exerciseNames: ['Overhead Press', 'Arnold Press', 'Lateral Raise', 'Rear Delt Fly', 'Face Pull'],
-  },
-  arms: {
-    title: 'Arms Day',
-    exerciseNames: ['Barbell Curl', 'Hammer Curl', 'Tricep Pushdown', 'Skull Crusher', 'Cable Curl'],
-  },
-  legs: {
-    title: 'Leg Day',
-    exerciseNames: ['Back Squat', 'Romanian Deadlift', 'Leg Press', 'Walking Lunge', 'Leg Curl'],
-  },
-  core: {
-    title: 'Core Day',
-    exerciseNames: ['Plank', 'Hanging Knee Raise', 'Russian Twist', 'Cable Crunch', 'Dead Bug'],
-  },
+  chest: partDay('chest', 'Chest Day'),
+  back: partDay('back', 'Back Day'),
+  shoulders: partDay('shoulders', 'Shoulder Day'),
+  arms: partDay('arms', 'Arms Day'),
+  legs: partDay('legs', 'Leg Day'),
+  core: partDay('core', 'Core Day'),
   cardio: {
     title: 'Cardio Day',
     exerciseNames: [...CARDIO_EXERCISE_NAMES],
@@ -70,10 +56,10 @@ export const PART_WORKOUTS: Record<MuscleGroup, { title: string; exerciseNames: 
   full: {
     title: 'Full Body',
     exerciseNames: [
-      'Back Squat',
+      'Barbell Back Squat',
       'Barbell Bench Press',
-      'Barbell Row',
-      'Overhead Press',
+      'Bent-Over Barbell Row',
+      'Barbell Overhead Press',
       'Plank',
       'Kettlebell Swing',
     ],
@@ -82,39 +68,39 @@ export const PART_WORKOUTS: Record<MuscleGroup, { title: string; exerciseNames: 
 
 const UPPER_EXERCISES = [
   'Barbell Bench Press',
-  'Barbell Row',
-  'Overhead Press',
-  'Pull-Up',
-  'Lateral Raise',
-  'Barbell Curl',
-  'Tricep Pushdown',
+  'Bent-Over Barbell Row',
+  'Barbell Overhead Press',
+  'Pull-Ups',
+  'Dumbbell Lateral Raise',
+  'Barbell Biceps Curl',
+  'Triceps Pushdown',
 ]
 
 const LOWER_EXERCISES = [
-  'Back Squat',
+  'Barbell Back Squat',
   'Romanian Deadlift',
   'Leg Press',
-  'Walking Lunge',
-  'Leg Curl',
+  'Walking Lunges',
+  'Lying Leg Curl',
   'Plank',
 ]
 
 const PUSH_EXERCISES = [
   'Barbell Bench Press',
   'Incline Dumbbell Press',
-  'Overhead Press',
-  'Lateral Raise',
-  'Tricep Pushdown',
-  'Push-Up',
+  'Barbell Overhead Press',
+  'Dumbbell Lateral Raise',
+  'Triceps Pushdown',
+  'Push-Ups',
 ]
 
 const PULL_EXERCISES = [
-  'Pull-Up',
-  'Barbell Row',
+  'Pull-Ups',
+  'Bent-Over Barbell Row',
   'Lat Pulldown',
   'Seated Cable Row',
   'Face Pull',
-  'Barbell Curl',
+  'Barbell Biceps Curl',
 ]
 
 function day(
@@ -195,12 +181,12 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
       ]),
       rest(4),
       day(5, ['full'], 'Full Body C', [
-        'Back Squat',
-        'Push-Up',
+        'Barbell Back Squat',
+        'Push-Ups',
         'Seated Cable Row',
-        'Overhead Press',
-        'Walking Lunge',
-        'Russian Twist',
+        'Barbell Overhead Press',
+        'Walking Lunges',
+        'Russian Twists',
       ]),
       rest(6),
     ],
@@ -291,112 +277,3 @@ export function templateWorkoutPresets(): WorkoutPresetOption[] {
       })),
   )
 }
-
-/** Extra exercises beyond the original seed — used for richer part workouts */
-export const EXTRA_EXERCISES: Omit<Exercise, 'id'>[] = [
-  {
-    name: 'Incline Dumbbell Press',
-    muscle: 'chest',
-    equipment: 'Dumbbells',
-    description: 'Press on an incline bench for upper chest emphasis.',
-    imageKey: 'incline-press',
-    isCustom: false,
-  },
-  {
-    name: 'Cable Crossover',
-    muscle: 'chest',
-    equipment: 'Cable',
-    description: 'Sweep cables together in front of your chest.',
-    imageKey: 'cable-crossover',
-    isCustom: false,
-  },
-  {
-    name: 'Seated Cable Row',
-    muscle: 'back',
-    equipment: 'Cable',
-    description: 'Pull the handle to your torso, squeeze shoulder blades.',
-    imageKey: 'seated-row',
-    isCustom: false,
-  },
-  {
-    name: 'Face Pull',
-    muscle: 'back',
-    equipment: 'Cable',
-    description: 'Pull toward your face with elbows high — great for rear delts.',
-    imageKey: 'face-pull',
-    isCustom: false,
-  },
-  {
-    name: 'Arnold Press',
-    muscle: 'shoulders',
-    equipment: 'Dumbbells',
-    description: 'Rotate palms as you press overhead.',
-    imageKey: 'arnold-press',
-    isCustom: false,
-  },
-  {
-    name: 'Rear Delt Fly',
-    muscle: 'shoulders',
-    equipment: 'Dumbbells',
-    description: 'Hinge forward and raise arms out to the sides.',
-    imageKey: 'rear-delt',
-    isCustom: false,
-  },
-  {
-    name: 'Hammer Curl',
-    muscle: 'arms',
-    equipment: 'Dumbbells',
-    description: 'Curl with a neutral grip for brachialis and forearms.',
-    imageKey: 'hammer-curl',
-    isCustom: false,
-  },
-  {
-    name: 'Skull Crusher',
-    muscle: 'arms',
-    equipment: 'Barbell',
-    description: 'Lower the bar toward your forehead, then extend.',
-    imageKey: 'skull-crusher',
-    isCustom: false,
-  },
-  {
-    name: 'Cable Curl',
-    muscle: 'arms',
-    equipment: 'Cable',
-    description: 'Curl with constant cable tension.',
-    imageKey: 'cable-curl',
-    isCustom: false,
-  },
-  {
-    name: 'Leg Curl',
-    muscle: 'legs',
-    equipment: 'Machine',
-    description: 'Curl heels toward glutes, control the eccentric.',
-    imageKey: 'leg-curl',
-    isCustom: false,
-  },
-  {
-    name: 'Cable Crunch',
-    muscle: 'core',
-    equipment: 'Cable',
-    description: 'Kneel and crunch the cable down with abs, not arms.',
-    imageKey: 'cable-crunch',
-    isCustom: false,
-  },
-  {
-    name: 'Dead Bug',
-    muscle: 'core',
-    equipment: 'Bodyweight',
-    description: 'Extend opposite arm and leg while keeping low back flat.',
-    imageKey: 'dead-bug',
-    isCustom: false,
-  },
-  {
-    name: 'Rowing Machine',
-    muscle: 'cardio',
-    equipment: 'Machine',
-    description: 'Drive with legs, then lean and pull. Smooth strokes.',
-    imageKey: 'rower',
-    isCustom: false,
-  },
-  ...CARDIO_SEED_EXERCISES,
-]

@@ -18,6 +18,11 @@ import {
   Trash2,
 } from 'lucide-react'
 import { SaveWorkoutToPlanModal } from '../components/SaveWorkoutToPlanModal'
+import {
+  EXERCISES_BY_MUSCLE,
+  LIBRARY_MUSCLE_ORDER,
+  resolveExerciseName,
+} from '../data/exerciseLibrary'
 import { filterExercisesForBrowse } from '../lib/exerciseSearch'
 import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
@@ -117,6 +122,13 @@ function validateWorkout(input: {
   }
 
   return errors
+}
+
+function lookupExercise(byName: Map<string, Exercise>, name: string): Exercise | undefined {
+  const hit = byName.get(name)
+  if (hit) return hit
+  const resolved = resolveExerciseName(name)
+  return resolved === name ? undefined : byName.get(resolved)
 }
 
 export function LogWorkoutPage() {
@@ -282,7 +294,7 @@ export function LogWorkoutPage() {
     if (part && PART_WORKOUTS[part]) {
       const workout = PART_WORKOUTS[part]
       const picked = workout.exerciseNames
-        .map((n) => byName.get(n))
+        .map((n) => lookupExercise(byName, n))
         .filter((e): e is Exercise => Boolean(e?.id))
       if (picked.length) {
         setTitle(workout.title)
@@ -308,7 +320,7 @@ export function LogWorkoutPage() {
       const day = getPlanDayForWeekday(activePlan.days, wd)
       if (day.muscles.length > 0) {
         const picked = day.exerciseNames
-          .map((n) => byName.get(n))
+          .map((n) => lookupExercise(byName, n))
           .filter((e): e is Exercise => Boolean(e?.id))
         if (picked.length) {
           setTitle(day.title)
@@ -337,14 +349,30 @@ export function LogWorkoutPage() {
 
   const isPickStep = !session && logStep === 'exercises'
 
+  const showGroupedBrowse =
+    isPickStep && !query.trim() && muscleFilter === 'all'
+
   const browseExercises = useMemo(
     () =>
       filterExercisesForBrowse(exercises ?? [], query, muscleFilter, recentExerciseIds, {
-        idleLimit: isPickStep ? 5 : 8,
+        idleLimit: showGroupedBrowse ? 200 : isPickStep ? 5 : 8,
         searchLimit: 40,
       }),
-    [exercises, query, muscleFilter, recentExerciseIds, isPickStep],
+    [exercises, query, muscleFilter, recentExerciseIds, isPickStep, showGroupedBrowse],
   )
+
+  const groupedBrowseSections = useMemo(() => {
+    if (!showGroupedBrowse || !exercises?.length) return null
+    const byName = new Map(exercises.map((e) => [e.name.trim().toLowerCase(), e]))
+    const perGroup = isPickStep ? 4 : 6
+    return LIBRARY_MUSCLE_ORDER.map((muscle) => {
+      const items = EXERCISES_BY_MUSCLE[muscle]
+        .map((def) => byName.get(def.name.trim().toLowerCase()))
+        .filter((e): e is Exercise => Boolean(e?.id))
+        .slice(0, perGroup)
+      return { muscle, items }
+    }).filter((s) => s.items.length > 0)
+  }, [showGroupedBrowse, exercises, isPickStep])
 
   const elapsedSec = session ? sessionElapsedSec(session, now) : 0
   const targetSec = (session?.durationMin ?? parseNumeric(duration, 0)) * 60
@@ -570,7 +598,7 @@ export function LogWorkoutPage() {
     if (!exercises?.length || alreadyLogged) return
     const byName = new Map(exercises.map((e) => [e.name, e]))
     const picked = exerciseNames
-      .map((n) => byName.get(n))
+      .map((n) => lookupExercise(byName, n))
       .filter((e): e is Exercise => Boolean(e?.id))
     if (!picked.length) {
       setError('Couldn’t load that preset — exercises missing from the library.')
@@ -681,7 +709,9 @@ export function LogWorkoutPage() {
             <p className="text-[0.65rem] font-semibold text-[var(--ink-muted)]">
               {q
                 ? `${browseExercises.length} match${browseExercises.length === 1 ? '' : 'es'}`
-                : 'Recent — type to search all'}
+                : showGroupedBrowse
+                  ? 'By muscle group — search for any exercise'
+                  : 'Recent — type to search all'}
             </p>
             <button
               type="button"
@@ -711,7 +741,46 @@ export function LogWorkoutPage() {
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-0.5 px-0.5">
-          {browseExercises.length === 0 ? (
+          {groupedBrowseSections ? (
+            <div className="space-y-3 pb-1">
+              {groupedBrowseSections.map(({ muscle, items }) => (
+                <div key={muscle}>
+                  <p className="sticky top-0 z-[1] bg-[var(--bg)]/95 py-1 text-[0.65rem] font-bold uppercase tracking-wider text-[var(--brand)]">
+                    {MUSCLE_LABELS[muscle]}
+                  </p>
+                  <ul className="space-y-1">
+                    {items.map((ex) => {
+                      const added = ex.id != null && picked.has(ex.id)
+                      return (
+                        <li key={ex.id}>
+                          <button
+                            type="button"
+                            onClick={() => addExercise(ex)}
+                            disabled={added}
+                            className={`flex w-full items-center gap-2 rounded-lg bg-white text-left border border-[var(--line)] hover:border-[var(--brand)] disabled:opacity-55 ${
+                              compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold">{ex.name}</p>
+                              <p className="truncate text-[0.65rem] text-[var(--ink-muted)]">
+                                {ex.equipment}
+                              </p>
+                            </div>
+                            {added ? (
+                              <Check size={16} className="shrink-0 text-[var(--brand)]" />
+                            ) : (
+                              <Plus size={16} className="shrink-0 text-[var(--brand)]" />
+                            )}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : browseExercises.length === 0 ? (
             <p className="py-4 text-center text-sm text-[var(--ink-muted)]">
               {q ? 'No exercises match — try fewer or different words.' : 'No exercises in library yet.'}
             </p>

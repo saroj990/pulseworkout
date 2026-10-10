@@ -8,8 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { db, type Goals, type Preferences, type User } from '../db'
-import { SEED_EXERCISES } from '../data/exercises'
-import { EXTRA_EXERCISES } from '../data/plans'
+import { BUILTIN_EXERCISES } from '../data/exerciseLibrary'
 import {
   getSessionUserId,
   setSessionUserId,
@@ -54,7 +53,7 @@ async function dedupeBuiltInExercises() {
 }
 
 async function ensureSeedExercises() {
-  const allSeed = [...SEED_EXERCISES, ...EXTRA_EXERCISES]
+  const allSeed = BUILTIN_EXERCISES
   await dedupeBuiltInExercises()
   const existing = await db.exercises.filter((e) => !e.isCustom).toArray()
   if (existing.length === 0) {
