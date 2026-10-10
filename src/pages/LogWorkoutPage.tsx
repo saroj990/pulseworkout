@@ -1284,12 +1284,12 @@ export function LogWorkoutPage() {
                 <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.title}</p>
               )}
             </div>
-            <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2 sm:grid-cols-2 sm:gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="min-w-0">
                 <label className="label" htmlFor="date">Date</label>
                 <input
                   id="date"
-                  className={`input input-date-compact ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
+                  className={`input w-full ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
                   type="date"
                   max={today}
                   value={date}
@@ -1305,7 +1305,7 @@ export function LogWorkoutPage() {
                 <label className="label" htmlFor="duration">Minutes</label>
                 <input
                   id="duration"
-                  className={`input ${fieldErrors.duration ? 'border-[var(--danger)]' : ''}`}
+                  className={`input w-full ${fieldErrors.duration ? 'border-[var(--danger)]' : ''}`}
                   type="text"
                   inputMode="numeric"
                   value={duration}
@@ -1483,11 +1483,19 @@ export function LogWorkoutPage() {
             </div>
             </div>
           </section>
-          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
-            <button type="button" className="btn btn-secondary w-full" onClick={() => setLogStep('details')}>
+          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] grid-cols-2 gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
+            <button
+              type="button"
+              className="btn btn-secondary w-full min-w-0 px-2 text-xs sm:text-sm"
+              onClick={() => setLogStep('details')}
+            >
               Back
             </button>
-            <button type="button" className="btn btn-primary w-full" onClick={() => setLogStep('exercises')}>
+            <button
+              type="button"
+              className="btn btn-primary w-full min-w-0 px-2 text-xs leading-tight sm:text-sm"
+              onClick={() => setLogStep('exercises')}
+            >
               Skip — pick exercises
             </button>
           </div>
