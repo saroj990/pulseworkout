@@ -22,6 +22,7 @@ import {
   Target,
 } from 'lucide-react'
 import { ExerciseImage } from '../components/ExerciseImage'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { useAuth } from '../context/AuthContext'
 import { db, type MuscleGroup, type Workout } from '../db'
 import { MUSCLE_LABELS } from '../data/exercises'
@@ -222,6 +223,7 @@ export function DashboardPage() {
           <button type="button" className="home-icon-btn" aria-label="Notifications">
             <Bell size={17} />
           </button>
+          <ThemeToggle />
           <Link to="/settings" className="home-icon-btn" aria-label="Settings">
             <Settings size={17} />
           </Link>

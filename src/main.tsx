@@ -4,6 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
+import { applyDocumentTheme, readCachedColorTheme, resolveColorTheme } from './lib/theme'
+
+const bootTheme = resolveColorTheme(readCachedColorTheme())
+applyDocumentTheme(bootTheme)
 
 registerSW({ immediate: true })
 
