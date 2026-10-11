@@ -454,6 +454,58 @@ select.input {
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.15;
+  color: var(--ink);
+}
+
+.surface-elevated {
+  background: var(--bg-elevated);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.progress-track {
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--bg));
+  border: 1px solid var(--line);
+}
+
+.segment-track {
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+}
+
+.alert-error {
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-elevated));
+  color: var(--danger);
+}
+
+.modal-panel {
+  background: var(--bg-elevated);
+  color: var(--ink);
+}
+
+.water-accent-badge {
+  background: color-mix(in srgb, #0ea5e9 16%, var(--bg-elevated));
+  color: color-mix(in srgb, #0369a1 70%, var(--ink));
+}
+
+html[data-theme="dark"] .water-accent-badge {
+  background: rgb(14 165 233 / 0.18);
+  color: #7dd3fc;
+}
+
+.water-accent-label {
+  color: color-mix(in srgb, #0369a1 75%, var(--ink-muted));
+}
+
+html[data-theme="dark"] .water-accent-label {
+  color: #7dd3fc;
 }
 
 .page-subtitle {

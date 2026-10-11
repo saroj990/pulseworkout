@@ -106,7 +106,7 @@ export function AppShell() {
     const hit = await db.workouts
       .where('userId')
       .equals(user.id)
-      .filter((w) => w.date === today)
+      .filter((w) => w.date === today && !w.isPlanned)
       .first()
     return Boolean(hit)
   }, [user?.id, today])

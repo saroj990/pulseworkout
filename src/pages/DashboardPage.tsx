@@ -30,6 +30,7 @@ import { imageKeyForExercise } from '../data/exerciseImageKeys'
 import { DEFAULT_WEEKLY_WORKOUTS, positiveOrDefault } from '../data/goals'
 import { getPlanDayForWeekday, type Weekday } from '../data/plans'
 import { readLogPlanWeekdayOverride } from '../lib/logPlanOverride'
+import { isCompletedWorkout } from '../lib/plannedWorkout'
 import { DEFAULT_WATER_GOAL_ML, formatWater, waterProgress } from '../lib/water'
 
 function greeting(): string {
@@ -101,7 +102,7 @@ export function DashboardPage() {
   })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  const workoutList = workouts ?? []
+  const workoutList = (workouts ?? []).filter(isCompletedWorkout)
   const workoutDates = new Set(workoutList.map((w) => w.date))
 
   const thisWeek = workoutList.filter((w) => {

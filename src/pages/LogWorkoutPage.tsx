@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import {
   CalendarDays,
   Check,
@@ -24,6 +24,8 @@ import {
   resolveExerciseName,
 } from '../data/exerciseLibrary'
 import { filterExercisesForBrowse } from '../lib/exerciseSearch'
+import { savePlannedWorkout } from '../lib/plannedWorkout'
+import { filterVisibleExercises } from '../lib/userExercises'
 import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
 import { db, type Exercise, type MuscleGroup, type WorkoutExercise, type WorkoutSet } from '../db'
@@ -145,8 +147,18 @@ export function LogWorkoutPage() {
   const exerciseRefs = useRef<Record<number, HTMLElement | null>>({})
   const restIntervalRef = useRef<number | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
 
-  const exercises = useLiveQuery(() => db.exercises.toArray(), [])
+  const exercisesRaw = useLiveQuery(() => db.exercises.toArray(), [])
+  const exercises = useMemo(
+    () =>
+      filterVisibleExercises(
+        exercisesRaw ?? [],
+        user?.id,
+        preferences?.hiddenExerciseNames,
+      ),
+    [exercisesRaw, user?.id, preferences?.hiddenExerciseNames],
+  )
   const activePlan = useLiveQuery(async () => {
     if (!user?.id) return undefined
     return db.userPlans.where('userId').equals(user.id).filter((p) => p.active).first()
@@ -196,6 +208,13 @@ export function LogWorkoutPage() {
     }
   }, [logStep])
 
+  useEffect(() => {
+    if (searchParams.get('plan') !== 'tomorrow') return
+    setDate(tomorrow)
+    setTitle(`Workout — ${format(addDays(new Date(), 1), 'MMM d')}`)
+    setLogStep('details')
+  }, [searchParams, tomorrow])
+
   const existingForDate = useLiveQuery(async () => {
     if (!user?.id || !date) return undefined
     const matches = await db.workouts
@@ -206,8 +225,11 @@ export function LogWorkoutPage() {
     return matches.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
   }, [user?.id, date])
 
-  const alreadyLogged = Boolean(existingForDate) && !session
+  const existingPlanned = existingForDate?.isPlanned === true
+  const alreadyLogged = Boolean(existingForDate) && !existingPlanned && !session
   const isToday = date === today
+  const isTomorrow = date === tomorrow
+  const isPlanningAhead = date > today
 
   const calendarWeekday = useMemo(() => {
     const d = new Date(`${date}T12:00:00`)
@@ -473,12 +495,15 @@ export function LogWorkoutPage() {
         .equals(user.id)
         .filter((w) => w.date === workoutDate)
         .first()
-      if (duplicate) {
+      if (duplicate && !duplicate.isPlanned) {
         clearWorkoutSession()
         setSession(null)
         setShowCompletePrompt(false)
         navigate(`/history/${duplicate.id}`)
         return
+      }
+      if (duplicate?.isPlanned && duplicate.id != null) {
+        await db.workouts.delete(duplicate.id)
       }
 
       const nowIso = new Date().toISOString()
@@ -489,6 +514,7 @@ export function LogWorkoutPage() {
         notes: workoutNotes,
         durationMin: Math.max(1, Math.round(elapsedSec / 60) || durationMin),
         exercises: workoutExercises,
+        isPlanned: false,
         createdAt: nowIso,
         updatedAt: nowIso,
       })
@@ -567,7 +593,7 @@ export function LogWorkoutPage() {
     return (
       <div
         key={key}
-        className="flex items-stretch gap-0.5 rounded-lg border border-[var(--line)] bg-white overflow-hidden"
+        className="flex items-stretch gap-0.5 rounded-lg surface-elevated overflow-hidden"
       >
         <button
           type="button"
@@ -669,7 +695,7 @@ export function LogWorkoutPage() {
                   ? 'bg-[var(--brand)] text-white'
                   : done
                     ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                    : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+                    : 'surface-elevated text-[var(--ink-muted)]'
               }`}
             >
               <span
@@ -732,7 +758,7 @@ export function LogWorkoutPage() {
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
                   muscleFilter === m
                     ? 'bg-[var(--brand)] text-white'
-                    : 'bg-white border border-[var(--line)]'
+                    : 'surface-elevated text-[var(--ink-muted)]'
                 }`}
               >
                 {m === 'all' ? 'All' : MUSCLE_LABELS[m]}
@@ -757,7 +783,7 @@ export function LogWorkoutPage() {
                             type="button"
                             onClick={() => addExercise(ex)}
                             disabled={added}
-                            className={`flex w-full items-center gap-2 rounded-lg bg-white text-left border border-[var(--line)] hover:border-[var(--brand)] disabled:opacity-55 ${
+                            className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
                               compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                             }`}
                           >
@@ -794,7 +820,7 @@ export function LogWorkoutPage() {
                       type="button"
                       onClick={() => addExercise(ex)}
                       disabled={added}
-                      className={`flex w-full items-center gap-2 rounded-lg bg-white text-left border border-[var(--line)] hover:border-[var(--brand)] disabled:opacity-55 ${
+                      className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
                         compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                       }`}
                     >
@@ -1004,6 +1030,81 @@ export function LogWorkoutPage() {
     )
   }
 
+  function applySessionDate(next: 'today' | 'tomorrow') {
+    const d = next === 'today' ? today : tomorrow
+    setDate(d)
+    setTitle(`Workout — ${format(new Date(`${d}T12:00:00`), 'MMM d')}`)
+    clearFieldError('date')
+    setError('')
+  }
+
+  function editPlannedWorkout() {
+    if (!existingForDate?.isPlanned) return
+    setTitle(existingForDate.title)
+    setNotes(existingForDate.notes)
+    setDuration(String(existingForDate.durationMin))
+    setSelected(existingForDate.exercises)
+    setLogStep('exercises')
+    setError('')
+    setMessage('')
+  }
+
+  async function deletePlannedWorkout() {
+    if (!existingForDate?.id || !existingForDate.isPlanned) return
+    setBusy(true)
+    try {
+      await db.workouts.delete(existingForDate.id)
+      setSelected([])
+      setMessage('Plan removed.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onSavePlannedWorkout() {
+    if (!user?.id || session) return
+    const errors = validateWorkout({
+      title,
+      date,
+      duration,
+      selected,
+      requireSets: false,
+    })
+    delete errors.sets
+    setFieldErrors(errors)
+    if (errors.title || errors.date || errors.exercises) {
+      setError('Add a title and at least one exercise to save your plan.')
+      return
+    }
+    if (!isPlanningAhead) {
+      setError('Pick tomorrow (or a future date) to save a plan ahead of time.')
+      return
+    }
+
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await savePlannedWorkout({
+        userId: user.id,
+        date,
+        title: title.trim(),
+        notes: notes.trim(),
+        durationMin: Math.max(1, parseNumeric(duration, Number(defaultDuration) || 45)),
+        exercises: selected,
+        existingPlannedId: existingForDate?.isPlanned ? existingForDate.id : undefined,
+      })
+      setMessage(isTomorrow ? 'Tomorrow’s workout is planned.' : 'Workout plan saved.')
+      navigate('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function onSaveToPlan(e?: FormEvent) {
     e?.preventDefault()
     if (!user?.id || alreadyLogged || session) return
@@ -1107,6 +1208,60 @@ export function LogWorkoutPage() {
     'full',
   ]
 
+  if (existingPlanned && existingForDate && !session) {
+    return (
+      <div className="space-y-5">
+        <header className="animate-fade-up">
+          <h1 className="font-display text-3xl font-extrabold">Plan workout</h1>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            You’ve already picked exercises for{' '}
+            {format(new Date(`${existingForDate.date}T12:00:00`), 'EEE, MMM d')}.
+          </p>
+        </header>
+
+        <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
+          <div className="rounded-2xl surface-elevated px-4 py-3 text-sm">
+            <p className="font-bold text-[var(--ink)]">{existingForDate.title}</p>
+            <p className="mt-1 text-[var(--ink-muted)]">
+              {existingForDate.durationMin} min · {existingForDate.exercises.length} exercises · planned
+            </p>
+          </div>
+          <button type="button" className="btn btn-primary w-full" onClick={editPlannedWorkout}>
+            Edit plan
+          </button>
+          {existingForDate.date === today && (
+            <button
+              type="button"
+              className="btn btn-accent w-full"
+              onClick={() => {
+                setTitle(existingForDate.title)
+                setNotes(existingForDate.notes)
+                setDuration(String(existingForDate.durationMin))
+                setSelected(existingForDate.exercises)
+                setLogStep('exercises')
+                setMessage('')
+                setError('')
+              }}
+            >
+              Open to start
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary w-full"
+            disabled={busy}
+            onClick={() => void deletePlannedWorkout()}
+          >
+            {busy ? 'Removing…' : 'Delete plan'}
+          </button>
+          <button type="button" className="btn btn-ghost w-full" onClick={() => applySessionDate('today')}>
+            Plan a different day
+          </button>
+        </section>
+      </div>
+    )
+  }
+
   if (alreadyLogged && existingForDate) {
     return (
       <div className="space-y-5">
@@ -1132,8 +1287,8 @@ export function LogWorkoutPage() {
             </p>
           </div>
           <div className="space-y-3 p-5">
-            <div className="rounded-2xl bg-white border border-[var(--line)] px-4 py-3 text-sm">
-              <p className="font-bold">{existingForDate.title}</p>
+            <div className="surface-elevated rounded-2xl px-4 py-3 text-sm">
+              <p className="font-bold text-[var(--ink)]">{existingForDate.title}</p>
               <p className="mt-1 text-[var(--ink-muted)]">
                 {existingForDate.durationMin} min · {existingForDate.exercises.length} exercises
               </p>
@@ -1158,14 +1313,16 @@ export function LogWorkoutPage() {
   return (
     <div className="flex min-h-0 flex-col gap-4 sm:gap-5">
       <header className="animate-fade-up shrink-0">
-        <h1 className="font-display text-2xl font-extrabold sm:text-3xl">
+        <h1 className="font-display text-2xl font-extrabold text-[var(--ink)] sm:text-3xl">
           {session ? title : 'Log workout'}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           {session
             ? 'Mark each exercise done — 1 min rest between them (skippable).'
             : logStep === 'details'
-              ? 'Step 1 — set the basics for this session.'
+              ? isPlanningAhead
+                ? 'Step 1 — plan a session for tomorrow (or pick another date).'
+                : 'Step 1 — set the basics for this session.'
               : logStep === 'template'
                 ? 'Step 2 — load a template or skip to pick exercises yourself.'
                 : 'Step 3 — search and add exercises, then start.'}
@@ -1206,7 +1363,7 @@ export function LogWorkoutPage() {
             </button>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5">
+          <div className="mt-3 rounded-2xl surface-elevated px-3 py-2.5">
             {resting && restLeftSec > 0 ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1214,7 +1371,7 @@ export function LogWorkoutPage() {
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--accent)]">
                       Rest
                     </p>
-                    <p className="truncate text-sm font-bold">{currentActivityLabel}</p>
+                    <p className="truncate text-sm font-bold text-[var(--ink)]">{currentActivityLabel}</p>
                   </div>
                   <span className="shrink-0 font-display text-xl font-extrabold tabular-nums text-[var(--accent)]">
                     {formatClock(restLeftSec)}
@@ -1284,6 +1441,33 @@ export function LogWorkoutPage() {
                 <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.title}</p>
               )}
             </div>
+            <div>
+              <span className="label">When</span>
+              <div
+                className="segment-track mt-1.5 inline-flex w-full rounded-full p-0.5 text-xs font-bold sm:w-auto"
+                role="group"
+                aria-label="Session date"
+              >
+                <button
+                  type="button"
+                  className={`flex-1 rounded-full px-3 py-2 sm:flex-none sm:px-4 ${
+                    isToday ? 'bg-[var(--brand)] text-white' : 'text-[var(--ink-muted)]'
+                  }`}
+                  onClick={() => applySessionDate('today')}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-full px-3 py-2 sm:flex-none sm:px-4 ${
+                    isTomorrow ? 'bg-[var(--brand)] text-white' : 'text-[var(--ink-muted)]'
+                  }`}
+                  onClick={() => applySessionDate('tomorrow')}
+                >
+                  Tomorrow
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="min-w-0">
                 <label className="label" htmlFor="date">Date</label>
@@ -1291,7 +1475,8 @@ export function LogWorkoutPage() {
                   id="date"
                   className={`input w-full ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
                   type="date"
-                  max={today}
+                  min={today}
+                  max={tomorrow}
                   value={date}
                   onChange={(e) => {
                     setDate(e.target.value)
@@ -1331,10 +1516,10 @@ export function LogWorkoutPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[var(--brand)]" />
-                <h2 className="font-display text-base font-bold">Workouts</h2>
+                <h2 className="font-display text-base font-bold text-[var(--ink)]">Workouts</h2>
               </div>
               <div
-                className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 text-[0.65rem] font-bold"
+                className="segment-track inline-flex rounded-full p-0.5 text-[0.65rem] font-bold"
                 role="group"
                 aria-label="Preset load mode"
               >
@@ -1364,7 +1549,7 @@ export function LogWorkoutPage() {
             </p>
 
             {activePlan && (
-              <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-white/80 p-3">
+              <div className="space-y-2 rounded-2xl surface-elevated/80 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
                     {activePlan.name}
@@ -1398,7 +1583,7 @@ export function LogWorkoutPage() {
                             ? 'bg-[var(--brand)] text-white shadow-sm'
                             : isRest
                               ? 'border border-dashed border-[var(--line)] bg-[var(--bg)] text-[var(--ink-muted)]'
-                              : 'border border-[var(--line)] bg-white hover:border-[var(--brand)]'
+                              : 'surface-elevated hover:border-[var(--brand)]'
                         }`}
                         onClick={() => selectPlanWeekday(wd)}
                       >
@@ -1457,7 +1642,7 @@ export function LogWorkoutPage() {
             <div>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-left text-sm font-bold"
+                className="flex w-full items-center justify-between gap-2 rounded-xl surface-elevated px-3 py-2.5 text-left text-sm font-bold"
                 onClick={() => setShowMoreWorkouts((v) => !v)}
                 aria-expanded={showMoreWorkouts}
               >
@@ -1578,7 +1763,7 @@ export function LogWorkoutPage() {
                     {selected.map((ex, exIdx) => (
                       <span
                         key={`${ex.exerciseId}-${exIdx}`}
-                        className="inline-flex max-w-[10rem] shrink-0 items-center gap-1 rounded-full border border-[var(--line)] bg-white py-1 pl-2.5 pr-1 text-[0.65rem] font-bold"
+                        className="inline-flex max-w-[10rem] shrink-0 items-center gap-1 rounded-full surface-elevated py-1 pl-2.5 pr-1 text-[0.65rem] font-bold"
                       >
                         <span className="truncate">{ex.exerciseName}</span>
                         <button
@@ -1604,7 +1789,7 @@ export function LogWorkoutPage() {
             isPickStep && selected.length > 0 ? 'hidden sm:flex' : isPickStep ? 'hidden sm:flex' : ''
           }`}
         >
-          <h2 className="font-display text-lg font-bold sm:text-xl">
+          <h2 className="font-display text-lg font-bold text-[var(--ink)] sm:text-xl">
             Your list ({selected.length})
           </h2>
           {!session && (
@@ -1633,12 +1818,12 @@ export function LogWorkoutPage() {
         )}
 
         {(session || logStep === 'exercises') && fieldErrors.exercises && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+          <p className="alert-error">
             {fieldErrors.exercises}
           </p>
         )}
         {(session || logStep === 'exercises') && fieldErrors.sets && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+          <p className="alert-error">
             {fieldErrors.sets}
           </p>
         )}
@@ -1802,8 +1987,8 @@ export function LogWorkoutPage() {
                           set.completed
                             ? 'bg-[var(--brand)] text-white'
                             : canCompleteSet
-                              ? 'bg-white border border-[var(--line)]'
-                              : 'bg-white/70 border border-[var(--line)] opacity-60'
+                              ? 'surface-elevated'
+                              : 'surface-elevated opacity-60'
                         }`}
                       >
                         {set.completed ? <Check size={14} /> : setIdx + 1}
@@ -1908,7 +2093,7 @@ export function LogWorkoutPage() {
         )}
 
         {error && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+          <p className="alert-error">
             {error}
           </p>
         )}
@@ -1922,16 +2107,27 @@ export function LogWorkoutPage() {
           <>
             <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
               <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
-                {busy ? 'Saving…' : 'Save to plan'}
+                {busy ? 'Saving…' : 'Save to weekly plan'}
               </button>
-              <button
-                type="button"
-                className="btn btn-primary w-full"
-                disabled={busy}
-                onClick={onStartWorkout}
-              >
-                <Play size={16} /> Start · {selected.length}
-              </button>
+              {isPlanningAhead ? (
+                <button
+                  type="button"
+                  className="btn btn-primary w-full"
+                  disabled={busy}
+                  onClick={() => void onSavePlannedWorkout()}
+                >
+                  {busy ? 'Saving…' : isTomorrow ? 'Save for tomorrow' : 'Save plan'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary w-full"
+                  disabled={busy}
+                  onClick={onStartWorkout}
+                >
+                  <Play size={16} /> Start · {selected.length}
+                </button>
+              )}
             </div>
             <div className="h-[5.5rem] shrink-0 sm:hidden" aria-hidden />
           </>
@@ -1951,7 +2147,7 @@ export function LogWorkoutPage() {
 
       {showCompletePrompt && session && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-5">
-          <div className="w-full max-w-sm rounded-[var(--radius)] bg-white p-5 shadow-xl animate-fade-up">
+          <div className="w-full max-w-sm modal-panel rounded-[var(--radius)] p-5 shadow-xl animate-fade-up">
             <h3 className="font-display text-xl font-bold">Wrap up this workout?</h3>
             <p className="mt-2 text-sm text-[var(--ink-muted)]">
               You’re past your {session.durationMin}-minute target (plus a 10‑minute buffer). Confirm

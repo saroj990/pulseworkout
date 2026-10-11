@@ -38,6 +38,8 @@ export interface Preferences {
   onboardingDone: boolean
   /** App-wide light or dark appearance. */
   colorTheme?: ColorTheme
+  /** Built-in exercise names hidden from this user's library. */
+  hiddenExerciseNames?: string[]
   pinEnabled?: boolean
   pinHash?: string
   pinSalt?: string
@@ -88,6 +90,8 @@ export interface Workout {
   notes: string
   durationMin: number
   exercises: WorkoutExercise[]
+  /** Saved ahead of time — not counted as a completed session until logged live. */
+  isPlanned?: boolean
   createdAt: string
   updatedAt: string
 }
