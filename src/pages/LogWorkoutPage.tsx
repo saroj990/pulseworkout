@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import {
   CalendarDays,
   Check,
@@ -24,6 +24,7 @@ import {
   resolveExerciseName,
 } from '../data/exerciseLibrary'
 import { filterExercisesForBrowse } from '../lib/exerciseSearch'
+import { savePlannedWorkout } from '../lib/plannedWorkout'
 import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
 import { db, type Exercise, type MuscleGroup, type WorkoutExercise, type WorkoutSet } from '../db'
@@ -145,6 +146,7 @@ export function LogWorkoutPage() {
   const exerciseRefs = useRef<Record<number, HTMLElement | null>>({})
   const restIntervalRef = useRef<number | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
 
   const exercises = useLiveQuery(() => db.exercises.toArray(), [])
   const activePlan = useLiveQuery(async () => {
@@ -196,6 +198,13 @@ export function LogWorkoutPage() {
     }
   }, [logStep])
 
+  useEffect(() => {
+    if (searchParams.get('plan') !== 'tomorrow') return
+    setDate(tomorrow)
+    setTitle(`Workout — ${format(addDays(new Date(), 1), 'MMM d')}`)
+    setLogStep('details')
+  }, [searchParams, tomorrow])
+
   const existingForDate = useLiveQuery(async () => {
     if (!user?.id || !date) return undefined
     const matches = await db.workouts
@@ -206,8 +215,11 @@ export function LogWorkoutPage() {
     return matches.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
   }, [user?.id, date])
 
-  const alreadyLogged = Boolean(existingForDate) && !session
+  const existingPlanned = existingForDate?.isPlanned === true
+  const alreadyLogged = Boolean(existingForDate) && !existingPlanned && !session
   const isToday = date === today
+  const isTomorrow = date === tomorrow
+  const isPlanningAhead = date > today
 
   const calendarWeekday = useMemo(() => {
     const d = new Date(`${date}T12:00:00`)
@@ -473,12 +485,15 @@ export function LogWorkoutPage() {
         .equals(user.id)
         .filter((w) => w.date === workoutDate)
         .first()
-      if (duplicate) {
+      if (duplicate && !duplicate.isPlanned) {
         clearWorkoutSession()
         setSession(null)
         setShowCompletePrompt(false)
         navigate(`/history/${duplicate.id}`)
         return
+      }
+      if (duplicate?.isPlanned && duplicate.id != null) {
+        await db.workouts.delete(duplicate.id)
       }
 
       const nowIso = new Date().toISOString()
@@ -489,6 +504,7 @@ export function LogWorkoutPage() {
         notes: workoutNotes,
         durationMin: Math.max(1, Math.round(elapsedSec / 60) || durationMin),
         exercises: workoutExercises,
+        isPlanned: false,
         createdAt: nowIso,
         updatedAt: nowIso,
       })
@@ -1004,6 +1020,81 @@ export function LogWorkoutPage() {
     )
   }
 
+  function applySessionDate(next: 'today' | 'tomorrow') {
+    const d = next === 'today' ? today : tomorrow
+    setDate(d)
+    setTitle(`Workout — ${format(new Date(`${d}T12:00:00`), 'MMM d')}`)
+    clearFieldError('date')
+    setError('')
+  }
+
+  function editPlannedWorkout() {
+    if (!existingForDate?.isPlanned) return
+    setTitle(existingForDate.title)
+    setNotes(existingForDate.notes)
+    setDuration(String(existingForDate.durationMin))
+    setSelected(existingForDate.exercises)
+    setLogStep('exercises')
+    setError('')
+    setMessage('')
+  }
+
+  async function deletePlannedWorkout() {
+    if (!existingForDate?.id || !existingForDate.isPlanned) return
+    setBusy(true)
+    try {
+      await db.workouts.delete(existingForDate.id)
+      setSelected([])
+      setMessage('Plan removed.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onSavePlannedWorkout() {
+    if (!user?.id || session) return
+    const errors = validateWorkout({
+      title,
+      date,
+      duration,
+      selected,
+      requireSets: false,
+    })
+    delete errors.sets
+    setFieldErrors(errors)
+    if (errors.title || errors.date || errors.exercises) {
+      setError('Add a title and at least one exercise to save your plan.')
+      return
+    }
+    if (!isPlanningAhead) {
+      setError('Pick tomorrow (or a future date) to save a plan ahead of time.')
+      return
+    }
+
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await savePlannedWorkout({
+        userId: user.id,
+        date,
+        title: title.trim(),
+        notes: notes.trim(),
+        durationMin: Math.max(1, parseNumeric(duration, Number(defaultDuration) || 45)),
+        exercises: selected,
+        existingPlannedId: existingForDate?.isPlanned ? existingForDate.id : undefined,
+      })
+      setMessage(isTomorrow ? 'Tomorrow’s workout is planned.' : 'Workout plan saved.')
+      navigate('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function onSaveToPlan(e?: FormEvent) {
     e?.preventDefault()
     if (!user?.id || alreadyLogged || session) return
@@ -1107,6 +1198,60 @@ export function LogWorkoutPage() {
     'full',
   ]
 
+  if (existingPlanned && existingForDate && !session) {
+    return (
+      <div className="space-y-5">
+        <header className="animate-fade-up">
+          <h1 className="font-display text-3xl font-extrabold">Plan workout</h1>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            You’ve already picked exercises for{' '}
+            {format(new Date(`${existingForDate.date}T12:00:00`), 'EEE, MMM d')}.
+          </p>
+        </header>
+
+        <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
+          <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm">
+            <p className="font-bold">{existingForDate.title}</p>
+            <p className="mt-1 text-[var(--ink-muted)]">
+              {existingForDate.durationMin} min · {existingForDate.exercises.length} exercises · planned
+            </p>
+          </div>
+          <button type="button" className="btn btn-primary w-full" onClick={editPlannedWorkout}>
+            Edit plan
+          </button>
+          {existingForDate.date === today && (
+            <button
+              type="button"
+              className="btn btn-accent w-full"
+              onClick={() => {
+                setTitle(existingForDate.title)
+                setNotes(existingForDate.notes)
+                setDuration(String(existingForDate.durationMin))
+                setSelected(existingForDate.exercises)
+                setLogStep('exercises')
+                setMessage('')
+                setError('')
+              }}
+            >
+              Open to start
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary w-full"
+            disabled={busy}
+            onClick={() => void deletePlannedWorkout()}
+          >
+            {busy ? 'Removing…' : 'Delete plan'}
+          </button>
+          <button type="button" className="btn btn-ghost w-full" onClick={() => applySessionDate('today')}>
+            Plan a different day
+          </button>
+        </section>
+      </div>
+    )
+  }
+
   if (alreadyLogged && existingForDate) {
     return (
       <div className="space-y-5">
@@ -1165,7 +1310,9 @@ export function LogWorkoutPage() {
           {session
             ? 'Mark each exercise done — 1 min rest between them (skippable).'
             : logStep === 'details'
-              ? 'Step 1 — set the basics for this session.'
+              ? isPlanningAhead
+                ? 'Step 1 — plan a session for tomorrow (or pick another date).'
+                : 'Step 1 — set the basics for this session.'
               : logStep === 'template'
                 ? 'Step 2 — load a template or skip to pick exercises yourself.'
                 : 'Step 3 — search and add exercises, then start.'}
@@ -1284,6 +1431,33 @@ export function LogWorkoutPage() {
                 <p className="mt-1.5 text-xs font-semibold text-[var(--danger)]">{fieldErrors.title}</p>
               )}
             </div>
+            <div>
+              <span className="label">When</span>
+              <div
+                className="mt-1.5 inline-flex w-full rounded-full border border-[var(--line)] bg-white p-0.5 text-xs font-bold sm:w-auto"
+                role="group"
+                aria-label="Session date"
+              >
+                <button
+                  type="button"
+                  className={`flex-1 rounded-full px-3 py-2 sm:flex-none sm:px-4 ${
+                    isToday ? 'bg-[var(--brand)] text-white' : 'text-[var(--ink-muted)]'
+                  }`}
+                  onClick={() => applySessionDate('today')}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-full px-3 py-2 sm:flex-none sm:px-4 ${
+                    isTomorrow ? 'bg-[var(--brand)] text-white' : 'text-[var(--ink-muted)]'
+                  }`}
+                  onClick={() => applySessionDate('tomorrow')}
+                >
+                  Tomorrow
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="min-w-0">
                 <label className="label" htmlFor="date">Date</label>
@@ -1291,7 +1465,8 @@ export function LogWorkoutPage() {
                   id="date"
                   className={`input w-full ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
                   type="date"
-                  max={today}
+                  min={today}
+                  max={tomorrow}
                   value={date}
                   onChange={(e) => {
                     setDate(e.target.value)
@@ -1922,16 +2097,27 @@ export function LogWorkoutPage() {
           <>
             <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
               <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
-                {busy ? 'Saving…' : 'Save to plan'}
+                {busy ? 'Saving…' : 'Save to weekly plan'}
               </button>
-              <button
-                type="button"
-                className="btn btn-primary w-full"
-                disabled={busy}
-                onClick={onStartWorkout}
-              >
-                <Play size={16} /> Start · {selected.length}
-              </button>
+              {isPlanningAhead ? (
+                <button
+                  type="button"
+                  className="btn btn-primary w-full"
+                  disabled={busy}
+                  onClick={() => void onSavePlannedWorkout()}
+                >
+                  {busy ? 'Saving…' : isTomorrow ? 'Save for tomorrow' : 'Save plan'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary w-full"
+                  disabled={busy}
+                  onClick={onStartWorkout}
+                >
+                  <Play size={16} /> Start · {selected.length}
+                </button>
+              )}
             </div>
             <div className="h-[5.5rem] shrink-0 sm:hidden" aria-hidden />
           </>

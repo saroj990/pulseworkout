@@ -88,6 +88,8 @@ export interface Workout {
   notes: string
   durationMin: number
   exercises: WorkoutExercise[]
+  /** Saved ahead of time — not counted as a completed session until logged live. */
+  isPlanned?: boolean
   createdAt: string
   updatedAt: string
 }
