@@ -25,6 +25,7 @@ import {
 } from '../data/exerciseLibrary'
 import { filterExercisesForBrowse } from '../lib/exerciseSearch'
 import { savePlannedWorkout } from '../lib/plannedWorkout'
+import { filterVisibleExercises } from '../lib/userExercises'
 import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
 import { db, type Exercise, type MuscleGroup, type WorkoutExercise, type WorkoutSet } from '../db'
@@ -148,7 +149,16 @@ export function LogWorkoutPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
 
-  const exercises = useLiveQuery(() => db.exercises.toArray(), [])
+  const exercisesRaw = useLiveQuery(() => db.exercises.toArray(), [])
+  const exercises = useMemo(
+    () =>
+      filterVisibleExercises(
+        exercisesRaw ?? [],
+        user?.id,
+        preferences?.hiddenExerciseNames,
+      ),
+    [exercisesRaw, user?.id, preferences?.hiddenExerciseNames],
+  )
   const activePlan = useLiveQuery(async () => {
     if (!user?.id) return undefined
     return db.userPlans.where('userId').equals(user.id).filter((p) => p.active).first()

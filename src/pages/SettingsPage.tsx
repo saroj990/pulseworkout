@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays, Cloud, FileSpreadsheet, LogOut, Palette, Target, Trash2 } from 'lucide-react'
+import {
+  CalendarDays,
+  Cloud,
+  Dumbbell,
+  FileSpreadsheet,
+  LogOut,
+  Palette,
+  Target,
+  Trash2,
+} from 'lucide-react'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../db'
@@ -125,6 +134,16 @@ export function SettingsPage() {
         </p>
         <Link to="/goals" className="btn btn-secondary mt-3 w-full">
           <Target size={16} /> Edit goals
+        </Link>
+      </section>
+
+      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '82ms' }}>
+        <h2 className="font-display text-lg font-bold">Exercise library</h2>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">
+          Add or remove exercise names by muscle group (back, chest, biceps, triceps, and more).
+        </p>
+        <Link to="/settings/exercises" className="btn btn-secondary mt-3 w-full">
+          <Dumbbell size={16} /> Manage exercises
         </Link>
       </section>
 
