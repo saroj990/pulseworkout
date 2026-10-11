@@ -109,7 +109,7 @@ export function ExerciseAdminPage() {
         <Link to="/settings" className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-[var(--brand)]">
           <ArrowLeft size={16} /> Settings
         </Link>
-        <h1 className="font-display text-3xl font-extrabold">Exercise library</h1>
+        <h1 className="font-display text-3xl font-extrabold text-[var(--ink)]">Exercise library</h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Add custom moves or remove names you don’t use. Changes apply in Log → pick exercises.
         </p>
@@ -119,7 +119,7 @@ export function ExerciseAdminPage() {
       </header>
 
       <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
-        <h2 className="font-display text-lg font-bold">Muscle group</h2>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Muscle group</h2>
         <div className="flex flex-wrap gap-1.5">
           {ADMIN_EXERCISE_CATEGORIES.map((tab) => (
             <button
@@ -128,7 +128,7 @@ export function ExerciseAdminPage() {
               className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                 category === tab.id
                   ? 'bg-[var(--brand)] text-white'
-                  : 'border border-[var(--line)] bg-white text-[var(--ink-muted)]'
+                  : 'border border-[var(--line)] bg-[var(--bg-elevated)] text-[var(--ink-muted)] hover:text-[var(--ink)]'
               }`}
               onClick={() => setCategory(tab.id)}
             >
@@ -139,7 +139,7 @@ export function ExerciseAdminPage() {
       </section>
 
       <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
-        <h2 className="font-display text-lg font-bold">Add exercise</h2>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Add exercise</h2>
         <form onSubmit={(e) => void onAdd(e)} className="flex flex-col gap-2 sm:flex-row">
           <input
             className="input flex-1"
@@ -157,7 +157,9 @@ export function ExerciseAdminPage() {
       {(error || message) && (
         <p
           className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-            error ? 'bg-red-50 text-[var(--danger)]' : 'bg-[var(--brand-soft)] text-[var(--brand)]'
+            error
+              ? 'border border-[var(--danger)]/25 bg-[color-mix(in_srgb,var(--danger)_10%,var(--bg-elevated))] text-[var(--danger)]'
+              : 'bg-[var(--brand-soft)] text-[var(--brand)]'
           }`}
         >
           {error || message}
@@ -165,7 +167,7 @@ export function ExerciseAdminPage() {
       )}
 
       <section className="glass animate-fade-up rounded-[var(--radius)] p-4">
-        <h2 className="font-display text-lg font-bold">
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">
           {ADMIN_EXERCISE_CATEGORIES.find((c) => c.id === category)?.label} · {listed.length}
         </h2>
         <ul className="mt-3 max-h-[min(52dvh,28rem)] space-y-1 overflow-y-auto overscroll-contain">
@@ -177,8 +179,8 @@ export function ExerciseAdminPage() {
                 key={ex.id ?? ex.name}
                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${
                   hiddenRow
-                    ? 'border-dashed border-[var(--line)] opacity-60'
-                    : 'border-[var(--line)] bg-white'
+                    ? 'border-dashed border-[var(--line)] bg-[var(--bg-elevated)]/50 text-[var(--ink-muted)]'
+                    : 'border-[var(--line)] bg-[var(--bg-elevated)] text-[var(--ink)]'
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate font-semibold">{ex.name}</span>

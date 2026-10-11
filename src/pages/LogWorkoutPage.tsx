@@ -593,7 +593,7 @@ export function LogWorkoutPage() {
     return (
       <div
         key={key}
-        className="flex items-stretch gap-0.5 rounded-lg border border-[var(--line)] bg-white overflow-hidden"
+        className="flex items-stretch gap-0.5 rounded-lg surface-elevated overflow-hidden"
       >
         <button
           type="button"
@@ -695,7 +695,7 @@ export function LogWorkoutPage() {
                   ? 'bg-[var(--brand)] text-white'
                   : done
                     ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                    : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+                    : 'surface-elevated text-[var(--ink-muted)]'
               }`}
             >
               <span
@@ -758,7 +758,7 @@ export function LogWorkoutPage() {
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
                   muscleFilter === m
                     ? 'bg-[var(--brand)] text-white'
-                    : 'bg-white border border-[var(--line)]'
+                    : 'surface-elevated text-[var(--ink-muted)]'
                 }`}
               >
                 {m === 'all' ? 'All' : MUSCLE_LABELS[m]}
@@ -783,7 +783,7 @@ export function LogWorkoutPage() {
                             type="button"
                             onClick={() => addExercise(ex)}
                             disabled={added}
-                            className={`flex w-full items-center gap-2 rounded-lg bg-white text-left border border-[var(--line)] hover:border-[var(--brand)] disabled:opacity-55 ${
+                            className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
                               compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                             }`}
                           >
@@ -820,7 +820,7 @@ export function LogWorkoutPage() {
                       type="button"
                       onClick={() => addExercise(ex)}
                       disabled={added}
-                      className={`flex w-full items-center gap-2 rounded-lg bg-white text-left border border-[var(--line)] hover:border-[var(--brand)] disabled:opacity-55 ${
+                      className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
                         compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                       }`}
                     >
@@ -1220,8 +1220,8 @@ export function LogWorkoutPage() {
         </header>
 
         <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
-          <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm">
-            <p className="font-bold">{existingForDate.title}</p>
+          <div className="rounded-2xl surface-elevated px-4 py-3 text-sm">
+            <p className="font-bold text-[var(--ink)]">{existingForDate.title}</p>
             <p className="mt-1 text-[var(--ink-muted)]">
               {existingForDate.durationMin} min · {existingForDate.exercises.length} exercises · planned
             </p>
@@ -1287,8 +1287,8 @@ export function LogWorkoutPage() {
             </p>
           </div>
           <div className="space-y-3 p-5">
-            <div className="rounded-2xl bg-white border border-[var(--line)] px-4 py-3 text-sm">
-              <p className="font-bold">{existingForDate.title}</p>
+            <div className="surface-elevated rounded-2xl px-4 py-3 text-sm">
+              <p className="font-bold text-[var(--ink)]">{existingForDate.title}</p>
               <p className="mt-1 text-[var(--ink-muted)]">
                 {existingForDate.durationMin} min · {existingForDate.exercises.length} exercises
               </p>
@@ -1313,7 +1313,7 @@ export function LogWorkoutPage() {
   return (
     <div className="flex min-h-0 flex-col gap-4 sm:gap-5">
       <header className="animate-fade-up shrink-0">
-        <h1 className="font-display text-2xl font-extrabold sm:text-3xl">
+        <h1 className="font-display text-2xl font-extrabold text-[var(--ink)] sm:text-3xl">
           {session ? title : 'Log workout'}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
@@ -1363,7 +1363,7 @@ export function LogWorkoutPage() {
             </button>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5">
+          <div className="mt-3 rounded-2xl surface-elevated px-3 py-2.5">
             {resting && restLeftSec > 0 ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1371,7 +1371,7 @@ export function LogWorkoutPage() {
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-[var(--accent)]">
                       Rest
                     </p>
-                    <p className="truncate text-sm font-bold">{currentActivityLabel}</p>
+                    <p className="truncate text-sm font-bold text-[var(--ink)]">{currentActivityLabel}</p>
                   </div>
                   <span className="shrink-0 font-display text-xl font-extrabold tabular-nums text-[var(--accent)]">
                     {formatClock(restLeftSec)}
@@ -1444,7 +1444,7 @@ export function LogWorkoutPage() {
             <div>
               <span className="label">When</span>
               <div
-                className="mt-1.5 inline-flex w-full rounded-full border border-[var(--line)] bg-white p-0.5 text-xs font-bold sm:w-auto"
+                className="segment-track mt-1.5 inline-flex w-full rounded-full p-0.5 text-xs font-bold sm:w-auto"
                 role="group"
                 aria-label="Session date"
               >
@@ -1516,10 +1516,10 @@ export function LogWorkoutPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[var(--brand)]" />
-                <h2 className="font-display text-base font-bold">Workouts</h2>
+                <h2 className="font-display text-base font-bold text-[var(--ink)]">Workouts</h2>
               </div>
               <div
-                className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 text-[0.65rem] font-bold"
+                className="segment-track inline-flex rounded-full p-0.5 text-[0.65rem] font-bold"
                 role="group"
                 aria-label="Preset load mode"
               >
@@ -1549,7 +1549,7 @@ export function LogWorkoutPage() {
             </p>
 
             {activePlan && (
-              <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-white/80 p-3">
+              <div className="space-y-2 rounded-2xl surface-elevated/80 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-[var(--brand)]">
                     {activePlan.name}
@@ -1583,7 +1583,7 @@ export function LogWorkoutPage() {
                             ? 'bg-[var(--brand)] text-white shadow-sm'
                             : isRest
                               ? 'border border-dashed border-[var(--line)] bg-[var(--bg)] text-[var(--ink-muted)]'
-                              : 'border border-[var(--line)] bg-white hover:border-[var(--brand)]'
+                              : 'surface-elevated hover:border-[var(--brand)]'
                         }`}
                         onClick={() => selectPlanWeekday(wd)}
                       >
@@ -1642,7 +1642,7 @@ export function LogWorkoutPage() {
             <div>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-left text-sm font-bold"
+                className="flex w-full items-center justify-between gap-2 rounded-xl surface-elevated px-3 py-2.5 text-left text-sm font-bold"
                 onClick={() => setShowMoreWorkouts((v) => !v)}
                 aria-expanded={showMoreWorkouts}
               >
@@ -1763,7 +1763,7 @@ export function LogWorkoutPage() {
                     {selected.map((ex, exIdx) => (
                       <span
                         key={`${ex.exerciseId}-${exIdx}`}
-                        className="inline-flex max-w-[10rem] shrink-0 items-center gap-1 rounded-full border border-[var(--line)] bg-white py-1 pl-2.5 pr-1 text-[0.65rem] font-bold"
+                        className="inline-flex max-w-[10rem] shrink-0 items-center gap-1 rounded-full surface-elevated py-1 pl-2.5 pr-1 text-[0.65rem] font-bold"
                       >
                         <span className="truncate">{ex.exerciseName}</span>
                         <button
@@ -1789,7 +1789,7 @@ export function LogWorkoutPage() {
             isPickStep && selected.length > 0 ? 'hidden sm:flex' : isPickStep ? 'hidden sm:flex' : ''
           }`}
         >
-          <h2 className="font-display text-lg font-bold sm:text-xl">
+          <h2 className="font-display text-lg font-bold text-[var(--ink)] sm:text-xl">
             Your list ({selected.length})
           </h2>
           {!session && (
@@ -1818,12 +1818,12 @@ export function LogWorkoutPage() {
         )}
 
         {(session || logStep === 'exercises') && fieldErrors.exercises && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+          <p className="alert-error">
             {fieldErrors.exercises}
           </p>
         )}
         {(session || logStep === 'exercises') && fieldErrors.sets && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+          <p className="alert-error">
             {fieldErrors.sets}
           </p>
         )}
@@ -1987,8 +1987,8 @@ export function LogWorkoutPage() {
                           set.completed
                             ? 'bg-[var(--brand)] text-white'
                             : canCompleteSet
-                              ? 'bg-white border border-[var(--line)]'
-                              : 'bg-white/70 border border-[var(--line)] opacity-60'
+                              ? 'surface-elevated'
+                              : 'surface-elevated opacity-60'
                         }`}
                       >
                         {set.completed ? <Check size={14} /> : setIdx + 1}
@@ -2093,7 +2093,7 @@ export function LogWorkoutPage() {
         )}
 
         {error && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-[var(--danger)]">
+          <p className="alert-error">
             {error}
           </p>
         )}
@@ -2147,7 +2147,7 @@ export function LogWorkoutPage() {
 
       {showCompletePrompt && session && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-5">
-          <div className="w-full max-w-sm rounded-[var(--radius)] bg-white p-5 shadow-xl animate-fade-up">
+          <div className="w-full max-w-sm modal-panel rounded-[var(--radius)] p-5 shadow-xl animate-fade-up">
             <h3 className="font-display text-xl font-bold">Wrap up this workout?</h3>
             <p className="mt-2 text-sm text-[var(--ink-muted)]">
               You’re past your {session.durationMin}-minute target (plus a 10‑minute buffer). Confirm

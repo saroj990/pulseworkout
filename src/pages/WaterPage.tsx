@@ -105,7 +105,7 @@ export function WaterPage() {
             sublabel={`of ${formatWater(goalMl)}`}
           />
           <div className="min-w-0 flex-1">
-            <p className="font-display text-xl font-bold">Today</p>
+            <p className="font-display text-xl font-bold text-[var(--ink)]">Today</p>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {todayTotal >= goalMl
                 ? 'Goal reached — nice work.'
@@ -119,7 +119,7 @@ export function WaterPage() {
       </section>
 
       <section className="animate-fade-up space-y-3" style={{ animationDelay: '70ms' }}>
-        <h2 className="font-display text-lg font-bold">Quick add</h2>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Quick add</h2>
         <div className="grid grid-cols-3 gap-2">
           {WATER_QUICK_ADDS_ML.map((ml) => (
             <button
@@ -168,13 +168,13 @@ export function WaterPage() {
       </section>
 
       <section className="animate-fade-up space-y-3" style={{ animationDelay: '100ms' }}>
-        <h2 className="font-display text-lg font-bold">Today’s entries</h2>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Today’s entries</h2>
         {todayLogs.length === 0 ? (
           <div className="glass rounded-[var(--radius)] p-6 text-center">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl water-accent-badge">
               <Droplets size={20} />
             </div>
-            <p className="mt-3 font-bold">No water logged yet</p>
+            <p className="mt-3 font-bold text-[var(--ink)]">No water logged yet</p>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">Tap a quick amount to start.</p>
           </div>
         ) : (
@@ -184,11 +184,11 @@ export function WaterPage() {
                 key={log.id}
                 className="glass flex items-center gap-3 rounded-2xl px-3 py-3"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl water-accent-badge">
                   <Droplets size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold">{formatWater(log.amountMl)}</p>
+                  <p className="font-bold text-[var(--ink)]">{formatWater(log.amountMl)}</p>
                   <p className="text-xs text-[var(--ink-muted)]">
                     {format(parseISO(log.createdAt), 'h:mm a')}
                   </p>
@@ -208,7 +208,7 @@ export function WaterPage() {
       </section>
 
       <section className="animate-fade-up space-y-3" style={{ animationDelay: '130ms' }}>
-        <h2 className="font-display text-lg font-bold">Last 7 days</h2>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Last 7 days</h2>
         <div className="glass rounded-[var(--radius)] p-3 space-y-2">
           {recentDays.map((day) => {
             const pct = waterProgress(day.total, goalMl)
@@ -218,13 +218,13 @@ export function WaterPage() {
                 <p className="w-16 shrink-0 text-xs font-bold text-[var(--ink-muted)]">
                   {isToday ? 'Today' : format(parseISO(day.date), 'EEE')}
                 </p>
-                <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white border border-[var(--line)]">
+                <div className="progress-track h-2.5 min-w-0 flex-1">
                   <div
                     className="h-full rounded-full bg-sky-500 transition-all"
                     style={{ width: `${pct * 100}%` }}
                   />
                 </div>
-                <p className="w-14 shrink-0 text-right text-xs font-bold">
+                <p className="w-14 shrink-0 text-right text-xs font-bold text-[var(--ink)]">
                   {day.total > 0 ? formatWater(day.total) : '—'}
                 </p>
               </div>
@@ -281,9 +281,9 @@ export function WaterQuickCard({
         className={`glass animate-fade-up dash-mobile-tile ${behindOnWater && !highlight ? 'dash-mobile-tile--accent-focus' : ''}`}
         style={{ animationDelay: '85ms' }}
       >
-        <p className="dash-mobile-label text-sky-800">Water</p>
+        <p className="dash-mobile-label water-accent-label">Water</p>
         <div className="mt-1 flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg water-accent-badge">
             <Droplets size={16} />
           </div>
           <div className="min-w-0 flex-1">
@@ -291,7 +291,7 @@ export function WaterQuickCard({
               {formatWater(total)}
               <span className="dash-mobile-meta font-bold"> / {formatWater(goalMl)}</span>
             </p>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full border border-[var(--line)] bg-white">
+            <div className="progress-track mt-1 h-1.5">
               <div
                 className="h-full rounded-full bg-sky-500 transition-all"
                 style={{ width: `${progress * 100}%` }}
@@ -301,14 +301,14 @@ export function WaterQuickCard({
           <div className="flex shrink-0 gap-1">
             <button
               type="button"
-              className="dash-mobile-action rounded-lg border border-[var(--line)] bg-white"
+              className="dash-mobile-action surface-elevated rounded-lg"
               onClick={() => quickAdd(250)}
             >
               +250
             </button>
             <button
               type="button"
-              className="dash-mobile-action rounded-lg border border-[var(--line)] bg-white"
+              className="dash-mobile-action surface-elevated rounded-lg"
               onClick={() => quickAdd(500)}
             >
               +500
@@ -329,8 +329,8 @@ export function WaterQuickCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[0.65rem] font-bold uppercase tracking-wider text-sky-700">Water</p>
-          <p className={`font-display font-bold ${compact ? 'text-base' : 'mt-1 text-xl'}`}>
+          <p className="water-accent-label text-[0.65rem] font-bold uppercase tracking-wider">Water</p>
+          <p className={`font-display font-bold text-[var(--ink)] ${compact ? 'text-base' : 'mt-1 text-xl'}`}>
             {formatWater(total)}
             <span className="ml-1 text-xs font-bold text-[var(--ink-muted)] sm:text-sm">
               / {formatWater(goalMl)}
@@ -341,7 +341,7 @@ export function WaterQuickCard({
           Open
         </Link>
       </div>
-      <div className={`overflow-hidden rounded-full bg-white border border-[var(--line)] ${compact ? 'mt-2 h-2' : 'mt-3 h-2.5'}`}>
+      <div className={`progress-track ${compact ? 'mt-2 h-2' : 'mt-3 h-2.5'}`}>
         <div
           className="h-full rounded-full bg-sky-500 transition-all"
           style={{ width: `${progress * 100}%` }}
