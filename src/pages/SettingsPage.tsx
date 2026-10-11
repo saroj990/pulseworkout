@@ -115,20 +115,20 @@ export function SettingsPage() {
   return (
     <div className="space-y-5">
       <header className="animate-fade-up">
-        <h1 className="font-display text-3xl font-extrabold">Settings</h1>
+        <h1 className="font-display text-3xl font-extrabold text-[var(--ink)]">Settings</h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">Account, sync, and device storage.</p>
       </header>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4">
+      <section className="app-card animate-fade-up p-4">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Signed in</p>
-        <p className="mt-1 font-display text-xl font-bold">{user?.name}</p>
+        <p className="mt-1 font-display text-xl font-bold text-[var(--ink)]">{user?.name}</p>
         <button type="button" className="btn btn-secondary mt-4 w-full" onClick={logout}>
           <LogOut size={16} /> Sign out
         </button>
       </section>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '80ms' }}>
-        <h2 className="font-display text-lg font-bold">Goals</h2>
+      <section className="app-card animate-fade-up p-4" style={{ animationDelay: '80ms' }}>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Goals</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Weekly targets, water goal, and preferred muscles.
         </p>
@@ -137,8 +137,8 @@ export function SettingsPage() {
         </Link>
       </section>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '82ms' }}>
-        <h2 className="font-display text-lg font-bold">Exercise library</h2>
+      <section className="app-card animate-fade-up p-4" style={{ animationDelay: '82ms' }}>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Exercise library</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Add or remove exercise names by muscle group (back, chest, biceps, triceps, and more).
         </p>
@@ -147,10 +147,10 @@ export function SettingsPage() {
         </Link>
       </section>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '85ms' }}>
+      <section className="app-card animate-fade-up p-4 space-y-3" style={{ animationDelay: '85ms' }}>
         <div className="flex items-center gap-2">
           <Palette size={18} className="text-[var(--brand)]" />
-          <h2 className="font-display text-lg font-bold">Appearance</h2>
+          <h2 className="font-display text-lg font-bold text-[var(--ink)]">Appearance</h2>
         </div>
         <p className="text-sm text-[var(--ink-muted)]">
           Switch between light and dark across the app, including the home dashboard.
@@ -158,8 +158,8 @@ export function SettingsPage() {
         <ThemeToggle variant="segmented" />
       </section>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '90ms' }}>
-        <h2 className="font-display text-lg font-bold">Workout plans</h2>
+      <section className="app-card animate-fade-up p-4" style={{ animationDelay: '90ms' }}>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Workout plans</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Bro split, PPL, or build your own weekly schedule.
         </p>
@@ -170,8 +170,8 @@ export function SettingsPage() {
 
       <PinSettingsCard />
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '60ms' }}>
-        <h2 className="font-display text-lg font-bold">Export & sync</h2>
+      <section className="app-card animate-fade-up p-4 space-y-3" style={{ animationDelay: '60ms' }}>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Export & sync</h2>
         <p className="text-sm text-[var(--ink-muted)]">
           Workouts live in IndexedDB. Optionally export to Excel or upload a spreadsheet to your Google Drive.
         </p>
@@ -221,7 +221,7 @@ export function SettingsPage() {
         <p
           className={`rounded-xl px-3 py-2 text-sm font-semibold ${
             error
-              ? 'bg-red-50 text-[var(--danger)]'
+              ? 'alert-error'
               : 'bg-[var(--brand-soft)] text-[var(--brand)]'
           }`}
         >
@@ -229,8 +229,8 @@ export function SettingsPage() {
         </p>
       )}
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '100ms' }}>
-        <h2 className="font-display text-lg font-bold">Clear my data</h2>
+      <section className="app-card animate-fade-up p-4 space-y-3" style={{ animationDelay: '100ms' }}>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Clear my data</h2>
         <p className="text-sm text-[var(--ink-muted)]">
           Removes workouts, water logs, and plans from this device. Your account, goals, and preferences stay.
         </p>
@@ -270,8 +270,8 @@ export function SettingsPage() {
         )}
       </section>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '110ms' }}>
-        <h2 className="font-display text-lg font-bold">Offline</h2>
+      <section className="app-card animate-fade-up p-4" style={{ animationDelay: '110ms' }}>
+        <h2 className="font-display text-lg font-bold text-[var(--ink)]">Offline</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Pulse is a PWA. Install it to your home screen for app-like use. All logging works without a network.
         </p>

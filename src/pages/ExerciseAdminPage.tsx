@@ -118,7 +118,7 @@ export function ExerciseAdminPage() {
         </p>
       </header>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
+      <section className="app-card animate-fade-up p-4 space-y-3">
         <h2 className="font-display text-lg font-bold text-[var(--ink)]">Muscle group</h2>
         <div className="flex flex-wrap gap-1.5">
           {ADMIN_EXERCISE_CATEGORIES.map((tab) => (
@@ -128,7 +128,7 @@ export function ExerciseAdminPage() {
               className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                 category === tab.id
                   ? 'bg-[var(--brand)] text-white'
-                  : 'border border-[var(--line)] bg-[var(--bg-elevated)] text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                  : 'surface-elevated text-[var(--ink-muted)] hover:text-[var(--ink)]'
               }`}
               onClick={() => setCategory(tab.id)}
             >
@@ -138,7 +138,7 @@ export function ExerciseAdminPage() {
         </div>
       </section>
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
+      <section className="app-card animate-fade-up p-4 space-y-3">
         <h2 className="font-display text-lg font-bold text-[var(--ink)]">Add exercise</h2>
         <form onSubmit={(e) => void onAdd(e)} className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -166,7 +166,7 @@ export function ExerciseAdminPage() {
         </p>
       )}
 
-      <section className="glass animate-fade-up rounded-[var(--radius)] p-4">
+      <section className="app-card animate-fade-up p-4">
         <h2 className="font-display text-lg font-bold text-[var(--ink)]">
           {ADMIN_EXERCISE_CATEGORIES.find((c) => c.id === category)?.label} · {listed.length}
         </h2>
@@ -177,10 +177,10 @@ export function ExerciseAdminPage() {
             return (
               <li
                 key={ex.id ?? ex.name}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
                   hiddenRow
-                    ? 'border-dashed border-[var(--line)] bg-[var(--bg-elevated)]/50 text-[var(--ink-muted)]'
-                    : 'border-[var(--line)] bg-[var(--bg-elevated)] text-[var(--ink)]'
+                    ? 'surface-elevated opacity-60 text-[var(--ink-muted)]'
+                    : 'surface-elevated text-[var(--ink)]'
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate font-semibold">{ex.name}</span>

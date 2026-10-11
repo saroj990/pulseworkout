@@ -141,7 +141,7 @@ export function HistoryPage() {
     <div className="space-y-5">
       <header className="animate-fade-up">
         <p className="text-sm font-bold text-[var(--brand)]">Your training log</p>
-        <h1 className="font-display text-3xl font-extrabold">History</h1>
+        <h1 className="font-display text-3xl font-extrabold text-[var(--ink)]">History</h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Review past sessions, volume, and progress over time.
         </p>
@@ -196,7 +196,7 @@ export function HistoryPage() {
                   className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition ${
                     on
                       ? 'bg-[var(--brand)] text-white'
-                      : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+                      : 'surface-elevated text-[var(--ink-muted)]'
                   }`}
                 >
                   {chip.label}
@@ -208,7 +208,7 @@ export function HistoryPage() {
       )}
 
       {list.length === 0 && (
-        <div className="glass animate-fade-up overflow-hidden rounded-[var(--radius)]">
+        <div className="app-card animate-fade-up overflow-hidden rounded-[var(--radius)]">
           <div className="bg-[linear-gradient(135deg,var(--brand)_0%,#0b5550_55%,#134e4a_100%)] px-6 py-8 text-white">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
               <Dumbbell size={22} />
@@ -227,8 +227,8 @@ export function HistoryPage() {
       )}
 
       {list.length > 0 && filtered.length === 0 && (
-        <div className="glass rounded-[var(--radius)] p-8 text-center">
-          <p className="font-bold">No matching sessions</p>
+        <div className="app-card rounded-[var(--radius)] p-8 text-center">
+          <p className="font-bold text-[var(--ink)]">No matching sessions</p>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">Try another search or clear the filter.</p>
           <button
             type="button"
@@ -250,7 +250,7 @@ export function HistoryPage() {
               className="animate-fade-up flex items-end justify-between"
               style={{ animationDelay: `${80 + groupIdx * 30}ms` }}
             >
-              <h2 className="font-display text-lg font-bold">{monthLabel(key)}</h2>
+              <h2 className="font-display text-lg font-bold text-[var(--ink)]">{monthLabel(key)}</h2>
               <p className="text-xs font-bold text-[var(--ink-muted)]">
                 {items.length} session{items.length === 1 ? '' : 's'}
               </p>
@@ -267,7 +267,7 @@ export function HistoryPage() {
                   <Link
                     key={w.id}
                     to={`/history/${w.id}`}
-                    className="group glass animate-slide-in flex gap-3 rounded-[1.1rem] p-3.5 transition hover:border-[var(--brand)]/40 hover:shadow-[var(--shadow)]"
+                    className="group app-card animate-slide-in flex gap-3 p-3.5 transition hover:shadow-[var(--shadow)] hover:ring-2 hover:ring-[var(--brand)]/25"
                     style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
                   >
                     <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-[var(--brand)]">
@@ -377,7 +377,7 @@ function StatTile({
   icon: React.ReactNode
 }) {
   return (
-    <div className="glass rounded-2xl px-3 py-3">
+    <div className="app-card rounded-2xl px-3 py-3">
       <div className="flex items-center gap-1.5 text-[var(--brand)]">{icon}</div>
       <p className="mt-1.5 font-display text-xl font-extrabold leading-none">{value}</p>
       <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-wide text-[var(--ink-muted)]">
@@ -395,7 +395,7 @@ function MetaPill({
   icon?: React.ReactNode
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[0.7rem] font-bold text-[var(--ink-muted)] border border-[var(--line)]">
+    <span className="surface-elevated inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.7rem] font-bold text-[var(--ink-muted)]">
       {icon}
       {children}
     </span>
@@ -431,7 +431,7 @@ export function WorkoutDetailPage() {
 
   if (!workout) {
     return (
-      <div className="glass space-y-4 rounded-[var(--radius)] p-6 text-center">
+      <div className="app-card space-y-4 rounded-[var(--radius)] p-6 text-center">
         <p className="font-bold">Workout not found</p>
         <p className="text-sm text-[var(--ink-muted)]">It may have been deleted on this device.</p>
         <Link to="/history" className="btn btn-secondary">
@@ -460,7 +460,7 @@ export function WorkoutDetailPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--brand)]">{formatWorkoutDay(workout.date)}</p>
-            <h1 className="mt-1 font-display text-3xl font-extrabold leading-tight">
+            <h1 className="mt-1 font-display text-3xl font-extrabold leading-tight text-[var(--ink)]">
               {workout.title}
             </h1>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
@@ -481,7 +481,7 @@ export function WorkoutDetailPage() {
       </header>
 
       {confirmDelete && (
-        <div className="animate-fade-up rounded-[var(--radius)] border border-red-200 bg-red-50 p-4">
+        <div className="alert-error animate-fade-up p-4">
           <p className="font-bold text-[var(--danger)]">Delete this session?</p>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">This can’t be undone on this device.</p>
           <div className="mt-3 flex gap-2">
@@ -500,7 +500,7 @@ export function WorkoutDetailPage() {
       )}
 
       <section
-        className="glass animate-fade-up rounded-[var(--radius)] p-4"
+        className="app-card animate-fade-up rounded-[var(--radius)] p-4"
         style={{ animationDelay: '40ms' }}
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -514,7 +514,7 @@ export function WorkoutDetailPage() {
           />
         </div>
         {(muscles.length > 0 || heaviest > 0) && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)] pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)]/25 pt-4">
             {muscles.map((m) => (
               <span
                 key={m}
@@ -525,7 +525,7 @@ export function WorkoutDetailPage() {
               </span>
             ))}
             {heaviest > 0 && (
-              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-[var(--ink-muted)] border border-[var(--line)]">
+              <span className="surface-elevated rounded-full px-2.5 py-1 text-xs font-bold text-[var(--ink-muted)]">
                 Peak {heaviest} {units}
               </span>
             )}
@@ -534,7 +534,7 @@ export function WorkoutDetailPage() {
       </section>
 
       {workout.notes && (
-        <section className="glass animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '70ms' }}>
+        <section className="app-card animate-fade-up rounded-[var(--radius)] p-4" style={{ animationDelay: '70ms' }}>
           <p className="text-xs font-bold uppercase tracking-wide text-[var(--ink-muted)]">Notes</p>
           <p className="mt-2 text-sm leading-relaxed">{workout.notes}</p>
         </section>
@@ -542,7 +542,7 @@ export function WorkoutDetailPage() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold">Exercises</h2>
+          <h2 className="font-display text-xl font-bold text-[var(--ink)]">Exercises</h2>
           <p className="text-xs font-bold text-[var(--ink-muted)]">
             {workout.exercises.length} total
           </p>
@@ -554,10 +554,10 @@ export function WorkoutDetailPage() {
           return (
             <article
               key={`${ex.exerciseId}-${i}`}
-              className="glass animate-slide-in overflow-hidden rounded-[var(--radius)]"
+              className="app-card animate-slide-in overflow-hidden rounded-[var(--radius)]"
               style={{ animationDelay: `${i * 40}ms` }}
             >
-              <div className="flex items-center gap-3 border-b border-[var(--line)]/70 px-4 py-3">
+              <div className="flex items-center gap-3 border-b border-[var(--line)]/20 px-4 py-3">
                 <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{ex.exerciseName}</p>

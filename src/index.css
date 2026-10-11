@@ -162,7 +162,14 @@ h3,
 .glass {
   background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
   backdrop-filter: blur(12px);
-  border: 1px solid color-mix(in srgb, var(--line) 80%, white);
+  border: 1px solid var(--line);
+}
+
+/* App shell chrome — no hard edge lines */
+.app-chrome {
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  backdrop-filter: blur(14px);
+  border: none;
 }
 
 .btn {
@@ -319,7 +326,12 @@ select.input {
   position: sticky;
   top: 0;
   z-index: 30;
-  border-bottom: 1px solid var(--line);
+  border-bottom: none;
+  box-shadow: 0 8px 28px rgb(20 32 30 / 0.06);
+}
+
+html[data-theme="dark"] .app-topbar {
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.35);
 }
 
 .topbar-inner {
@@ -339,7 +351,12 @@ select.input {
   left: 0;
   right: 0;
   z-index: 40;
-  border-top: 1px solid var(--line);
+  border-top: none;
+  box-shadow: 0 -8px 28px rgb(20 32 30 / 0.08);
+}
+
+html[data-theme="dark"] .mobile-bottom-nav {
+  box-shadow: 0 -10px 32px rgb(0 0 0 / 0.4);
 }
 
 .desktop-grid {
@@ -381,7 +398,12 @@ select.input {
     position: sticky;
     top: 0;
     height: 100svh;
-    border-right: 1px solid var(--line);
+    border-right: none;
+    box-shadow: 4px 0 24px rgb(20 32 30 / 0.05);
+  }
+
+  html[data-theme="dark"] .desktop-sidebar {
+    box-shadow: 4px 0 28px rgb(0 0 0 / 0.35);
   }
 
   .app-topbar {
@@ -457,22 +479,39 @@ select.input {
   color: var(--ink);
 }
 
-.surface-elevated {
+/* Log / Water / settings sections — match home cards, no hard borders */
+.app-card {
+  border-radius: 1.125rem;
   background: var(--bg-elevated);
   color: var(--ink);
-  border: 1px solid var(--line);
+  border: none;
+  box-shadow: 0 8px 28px rgb(20 32 30 / 0.08);
+}
+
+html[data-theme="dark"] .app-card {
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+}
+
+.surface-elevated {
+  background: color-mix(in srgb, var(--ink) 4%, var(--bg-elevated));
+  color: var(--ink);
+  border: none;
+}
+
+html[data-theme="light"] .surface-elevated {
+  background: color-mix(in srgb, var(--bg) 35%, var(--bg-elevated));
 }
 
 .progress-track {
   overflow: hidden;
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--bg));
-  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 8%, var(--bg-elevated));
+  border: none;
 }
 
 .segment-track {
-  border: 1px solid var(--line);
-  background: var(--bg-elevated);
+  border: none;
+  background: color-mix(in srgb, var(--ink) 6%, var(--bg-elevated));
 }
 
 .alert-error {

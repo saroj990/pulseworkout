@@ -95,7 +95,7 @@ export function WaterPage() {
       </header>
 
       <section
-        className="glass animate-fade-up rounded-[var(--radius)] p-5 shadow-[var(--shadow)]"
+        className="app-card animate-fade-up rounded-[var(--radius)] p-5 shadow-[var(--shadow)]"
         style={{ animationDelay: '40ms' }}
       >
         <div className="flex items-center gap-5">
@@ -135,7 +135,7 @@ export function WaterPage() {
           ))}
         </div>
 
-        <div className="glass rounded-[var(--radius)] p-4 space-y-3">
+        <div className="app-card rounded-[var(--radius)] p-4 space-y-3">
           <label className="label" htmlFor="custom-water">
             Custom amount (ml)
           </label>
@@ -170,7 +170,7 @@ export function WaterPage() {
       <section className="animate-fade-up space-y-3" style={{ animationDelay: '100ms' }}>
         <h2 className="font-display text-lg font-bold text-[var(--ink)]">Today’s entries</h2>
         {todayLogs.length === 0 ? (
-          <div className="glass rounded-[var(--radius)] p-6 text-center">
+          <div className="app-card rounded-[var(--radius)] p-6 text-center">
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl water-accent-badge">
               <Droplets size={20} />
             </div>
@@ -182,7 +182,7 @@ export function WaterPage() {
             {todayLogs.map((log) => (
               <li
                 key={log.id}
-                className="glass flex items-center gap-3 rounded-2xl px-3 py-3"
+                className="app-card flex items-center gap-3 rounded-2xl px-3 py-3"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl water-accent-badge">
                   <Droplets size={18} />
@@ -209,7 +209,7 @@ export function WaterPage() {
 
       <section className="animate-fade-up space-y-3" style={{ animationDelay: '130ms' }}>
         <h2 className="font-display text-lg font-bold text-[var(--ink)]">Last 7 days</h2>
-        <div className="glass rounded-[var(--radius)] p-3 space-y-2">
+        <div className="app-card rounded-[var(--radius)] p-3 space-y-2">
           {recentDays.map((day) => {
             const pct = waterProgress(day.total, goalMl)
             const isToday = day.date === today
@@ -278,7 +278,7 @@ export function WaterQuickCard({
     const behindOnWater = total < goalMl
     return (
       <section
-        className={`glass animate-fade-up dash-mobile-tile ${behindOnWater && !highlight ? 'dash-mobile-tile--accent-focus' : ''}`}
+        className={`app-card animate-fade-up dash-mobile-tile ${behindOnWater && !highlight ? 'dash-mobile-tile--accent-focus' : ''}`}
         style={{ animationDelay: '85ms' }}
       >
         <p className="dash-mobile-label water-accent-label">Water</p>
@@ -324,7 +324,7 @@ export function WaterQuickCard({
 
   return (
     <section
-      className={`glass animate-fade-up rounded-[var(--radius)] ${compact ? 'p-3' : 'p-4'}`}
+      className={`app-card animate-fade-up rounded-[var(--radius)] ${compact ? 'p-3' : 'p-4'}`}
       style={{ animationDelay: '85ms' }}
     >
       <div className="flex items-center justify-between gap-2">

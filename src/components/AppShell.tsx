@@ -118,7 +118,7 @@ export function AppShell() {
       <OfflineBadge />
       <OldDataAlertModal />
 
-      <aside className="desktop-sidebar glass">
+      <aside className="desktop-sidebar app-chrome">
         <div className="flex h-full flex-col px-4 py-6">
           <div className="px-2">
             <p className="font-display text-2xl font-extrabold text-[var(--brand)]">Pulse</p>
@@ -141,7 +141,7 @@ export function AppShell() {
       </aside>
 
       <div className="app-content">
-        <header className={`app-topbar glass ${hideMobileTopbar ? 'hidden lg:block' : ''}`}>
+        <header className={`app-topbar app-chrome ${hideMobileTopbar ? 'hidden lg:block' : ''}`}>
           <div className="topbar-inner">
             <div className="min-w-0">
               <p className="font-display text-lg font-extrabold text-[var(--brand)] lg:hidden">Pulse</p>
@@ -178,7 +178,7 @@ export function AppShell() {
         </main>
       </div>
 
-      <nav className="mobile-bottom-nav glass" aria-label="Mobile">
+      <nav className="mobile-bottom-nav app-chrome" aria-label="Mobile">
         <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)] pt-1.5 sm:px-2 sm:pt-2">
           <NavItems loggedToday={done} variant="mobile" />
         </div>

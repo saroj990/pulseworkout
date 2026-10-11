@@ -1219,7 +1219,7 @@ export function LogWorkoutPage() {
           </p>
         </header>
 
-        <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
+        <section className="app-card animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
           <div className="rounded-2xl surface-elevated px-4 py-3 text-sm">
             <p className="font-bold text-[var(--ink)]">{existingForDate.title}</p>
             <p className="mt-1 text-[var(--ink-muted)]">
@@ -1272,7 +1272,7 @@ export function LogWorkoutPage() {
           </p>
         </header>
 
-        <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)]">
+        <section className="app-card animate-fade-up overflow-hidden rounded-[var(--radius)]">
           <div className="bg-[linear-gradient(135deg,var(--brand)_0%,#0b5550_100%)] px-5 py-6 text-white">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
               <CircleCheck size={22} />
@@ -1331,7 +1331,7 @@ export function LogWorkoutPage() {
       </header>
 
       {session && (
-        <section className="glass animate-fade-up sticky top-0 z-20 rounded-[var(--radius)] p-3 sm:p-4">
+        <section className="app-card animate-fade-up sticky top-0 z-20 rounded-[var(--radius)] p-3 sm:p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
               <Timer size={18} />
@@ -1424,7 +1424,7 @@ export function LogWorkoutPage() {
         noValidate
       >
         {!session && logStep === 'details' && (
-          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
+          <section className="app-card animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
             <div>
               <label className="label" htmlFor="title">Title</label>
               <input
@@ -1511,7 +1511,7 @@ export function LogWorkoutPage() {
 
         {!session && logStep === 'template' && (
           <>
-          <section className="glass animate-fade-up flex min-h-0 flex-col overflow-hidden rounded-[var(--radius)]">
+          <section className="app-card animate-fade-up flex min-h-0 flex-col overflow-hidden rounded-[var(--radius)]">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pb-2 max-h-[min(42dvh,22rem)] sm:max-h-[min(58dvh,30rem)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1668,7 +1668,7 @@ export function LogWorkoutPage() {
             </div>
             </div>
           </section>
-          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] grid-cols-2 gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
+          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] grid-cols-2 gap-2 bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
             <button
               type="button"
               className="btn btn-secondary w-full min-w-0 px-2 text-xs sm:text-sm"
@@ -1690,7 +1690,7 @@ export function LogWorkoutPage() {
 
         {!session && logStep === 'exercises' && (
           <>
-            <section className="glass shrink-0 rounded-[var(--radius)] px-3 py-2 sm:p-3 sm:space-y-2">
+            <section className="app-card shrink-0 rounded-[var(--radius)] px-3 py-2 sm:p-3 sm:space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <p className="min-w-0 flex-1 truncate font-bold">{title}</p>
                 <button
@@ -1742,12 +1742,12 @@ export function LogWorkoutPage() {
                 />
               )}
             </section>
-            <section className="glass flex min-h-[11rem] flex-col overflow-hidden rounded-[var(--radius)] p-3 sm:h-[min(42dvh,22rem)]">
+            <section className="app-card flex min-h-[11rem] flex-col overflow-hidden rounded-[var(--radius)] p-3 sm:h-[min(42dvh,22rem)]">
               <h2 className="mb-1 shrink-0 font-display text-sm font-bold sm:mb-2">Find & add</h2>
               {renderExerciseBrowser('min-h-0 flex-1', true)}
             </section>
             {selected.length > 0 && (
-              <section className="glass shrink-0 space-y-2 rounded-[var(--radius)] p-3 sm:hidden">
+              <section className="app-card shrink-0 space-y-2 rounded-[var(--radius)] p-3 sm:hidden">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold">{selected.length} in workout</p>
                   <button
@@ -1878,12 +1878,12 @@ export function LogWorkoutPage() {
               }}
               className={`animate-slide-in rounded-[var(--radius)] p-4 transition ${
                 isFocus || isNextUp
-                  ? 'glass ring-2 ring-[var(--brand)] shadow-[0_8px_28px_rgba(15,118,110,0.18)]'
+                  ? 'app-card ring-2 ring-[var(--brand)] shadow-[0_8px_28px_rgba(15,118,110,0.18)]'
                   : done
-                    ? 'glass opacity-70'
+                    ? 'app-card opacity-70'
                     : dimmed
-                      ? 'glass opacity-50'
-                      : 'glass'
+                      ? 'app-card opacity-50'
+                      : 'app-card'
               }`}
               style={{ animationDelay: `${exIdx * 40}ms` }}
             >
@@ -2105,7 +2105,7 @@ export function LogWorkoutPage() {
 
         {!session && logStep === 'exercises' ? (
           <>
-            <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
+            <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
               <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
                 {busy ? 'Saving…' : 'Save to weekly plan'}
               </button>
