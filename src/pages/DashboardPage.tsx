@@ -110,7 +110,7 @@ export function DashboardPage() {
     return d >= weekStart && d < addDays(weekStart, 7)
   })
 
-  const todayWorkout = workoutList.find((w) => w.date === today && isCompletedWorkout(w))
+  const todayWorkout = workoutList.find((w) => w.date === today)
   const calendarWeekday = new Date().getDay() as Weekday
   const planWeekdayForToday =
     user?.id != null
