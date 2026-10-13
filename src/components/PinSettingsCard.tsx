@@ -51,7 +51,7 @@ export function PinSettingsCard() {
   }
 
   return (
-    <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '70ms' }}>
+    <section className="app-card animate-fade-up rounded-[var(--radius)] p-4 space-y-3" style={{ animationDelay: '70ms' }}>
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
           <KeyRound size={18} />
@@ -79,7 +79,7 @@ export function PinSettingsCard() {
               </button>
               <button
                 type="button"
-                className="btn flex-1 border border-red-200 bg-red-50 text-[var(--danger)]"
+                className="btn btn-danger-soft flex-1"
                 onClick={() => setMode('disable')}
               >
                 Turn off PIN
@@ -90,7 +90,7 @@ export function PinSettingsCard() {
       )}
 
       {mode !== 'idle' && (
-        <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white p-3">
+        <div className="surface-elevated space-y-3 rounded-2xl p-3">
           {(mode === 'change' || mode === 'disable') && (
             <div>
               <label className="label" htmlFor="current-pin">Current PIN</label>

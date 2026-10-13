@@ -267,7 +267,7 @@ export function HistoryPage() {
                   <Link
                     key={w.id}
                     to={`/history/${w.id}`}
-                    className="group app-card animate-slide-in flex gap-3 p-3.5 transition hover:shadow-[var(--shadow)] hover:ring-2 hover:ring-[var(--brand)]/25"
+                    className="group app-card animate-slide-in flex gap-3 p-3.5 transition hover:shadow-[var(--shadow)] hover:shadow-[0_8px_28px_rgba(15,118,110,0.15)]"
                     style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
                   >
                     <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-[var(--brand)]">
@@ -330,12 +330,12 @@ export function HistoryPage() {
                       )}
 
                       {w.exercises[0] && (
-                        <div className="mt-2.5 flex items-center gap-2 border-t border-[var(--line)]/80 pt-2.5">
+                        <div className="mt-2.5 flex items-center gap-2 pt-2.5">
                           <div className="flex -space-x-2">
                             {w.exercises.slice(0, 4).map((ex, idx) => (
                               <div
                                 key={`${ex.exerciseId}-${idx}`}
-                                className="rounded-xl ring-2 ring-white"
+                                className="rounded-xl shadow-[0_0_0_2px_var(--bg-elevated)]"
                               >
                                 <ExerciseImage
                                   imageKey={ex.imageKey}
@@ -514,7 +514,7 @@ export function WorkoutDetailPage() {
           />
         </div>
         {(muscles.length > 0 || heaviest > 0) && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)]/25 pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-2 mt-4 pt-4">
             {muscles.map((m) => (
               <span
                 key={m}
@@ -557,7 +557,7 @@ export function WorkoutDetailPage() {
               className="app-card animate-slide-in overflow-hidden rounded-[var(--radius)]"
               style={{ animationDelay: `${i * 40}ms` }}
             >
-              <div className="flex items-center gap-3 border-b border-[var(--line)]/20 px-4 py-3">
+              <div className="flex items-center gap-3 px-4 py-3">
                 <ExerciseImage imageKey={ex.imageKey} muscle={ex.muscle} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{ex.exerciseName}</p>

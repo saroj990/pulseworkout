@@ -605,7 +605,7 @@ export function LogWorkoutPage() {
         </button>
         <button
           type="button"
-          className="shrink-0 border-l border-[var(--line)] px-2.5 text-[var(--brand)] hover:bg-[var(--brand-soft)]"
+          className="shrink-0 rounded-lg bg-[color-mix(in_srgb,var(--brand)_10%,var(--bg-elevated))] px-2.5 text-[var(--brand)] hover:bg-[var(--brand-soft)]"
           aria-label={`Save ${label} to plan`}
           onClick={() => openSavePresetToPlan(title, exerciseNames, muscles)}
         >
@@ -783,7 +783,7 @@ export function LogWorkoutPage() {
                             type="button"
                             onClick={() => addExercise(ex)}
                             disabled={added}
-                            className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
+                            className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left interactive-surface disabled:opacity-55 ${
                               compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                             }`}
                           >
@@ -820,7 +820,7 @@ export function LogWorkoutPage() {
                       type="button"
                       onClick={() => addExercise(ex)}
                       disabled={added}
-                      className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
+                      className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left interactive-surface disabled:opacity-55 ${
                         compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                       }`}
                     >
@@ -1429,7 +1429,7 @@ export function LogWorkoutPage() {
               <label className="label" htmlFor="title">Title</label>
               <input
                 id="title"
-                className={`input ${fieldErrors.title ? 'border-[var(--danger)]' : ''}`}
+                className={`input ${fieldErrors.title ? 'field-invalid' : ''}`}
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value)
@@ -1473,7 +1473,7 @@ export function LogWorkoutPage() {
                 <label className="label" htmlFor="date">Date</label>
                 <input
                   id="date"
-                  className={`input w-full ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
+                  className={`input w-full ${fieldErrors.date ? 'field-invalid' : ''}`}
                   type="date"
                   min={today}
                   max={tomorrow}
@@ -1490,7 +1490,7 @@ export function LogWorkoutPage() {
                 <label className="label" htmlFor="duration">Minutes</label>
                 <input
                   id="duration"
-                  className={`input w-full ${fieldErrors.duration ? 'border-[var(--danger)]' : ''}`}
+                  className={`input w-full ${fieldErrors.duration ? 'field-invalid' : ''}`}
                   type="text"
                   inputMode="numeric"
                   value={duration}
@@ -1582,8 +1582,8 @@ export function LogWorkoutPage() {
                           selected
                             ? 'bg-[var(--brand)] text-white shadow-sm'
                             : isRest
-                              ? 'border border-dashed border-[var(--line)] bg-[var(--bg)] text-[var(--ink-muted)]'
-                              : 'surface-elevated hover:border-[var(--brand)]'
+                              ? 'bg-[color-mix(in_srgb,var(--ink)_6%,var(--bg))] text-[var(--ink-muted)] opacity-90'
+                              : 'surface-elevated interactive-surface'
                         }`}
                         onClick={() => selectPlanWeekday(wd)}
                       >
@@ -1830,8 +1830,8 @@ export function LogWorkoutPage() {
 
         {(session || logStep === 'exercises') && selected.length === 0 && (
           <p
-            className={`rounded-xl border border-dashed px-4 py-4 text-center text-sm text-[var(--ink-muted)] sm:py-6 ${
-              fieldErrors.exercises ? 'border-[var(--danger)]' : 'border-[var(--line)]'
+            className={`empty-placeholder sm:py-6 ${
+              fieldErrors.exercises ? 'state-invalid' : ''
             } ${isPickStep ? 'hidden sm:block' : ''}`}
           >
             Search above and tap exercises to add them here.
@@ -1878,7 +1878,7 @@ export function LogWorkoutPage() {
               }}
               className={`animate-slide-in rounded-[var(--radius)] p-4 transition ${
                 isFocus || isNextUp
-                  ? 'app-card ring-2 ring-[var(--brand)] shadow-[0_8px_28px_rgba(15,118,110,0.18)]'
+                  ? 'app-card shadow-[0_8px_28px_rgba(15,118,110,0.22),0_0_0_2px_var(--brand-soft)]'
                   : done
                     ? 'app-card opacity-70'
                     : dimmed
@@ -1994,7 +1994,7 @@ export function LogWorkoutPage() {
                         {set.completed ? <Check size={14} /> : setIdx + 1}
                       </button>
                       <input
-                        className={`input py-2 ${set.reps <= 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
+                        className={`input py-2 ${set.reps <= 0 && fieldErrors.sets ? 'field-invalid' : ''}`}
                         type="text"
                         inputMode="numeric"
                         value={toNumericString(set.reps, '0')}
@@ -2006,7 +2006,7 @@ export function LogWorkoutPage() {
                         }
                       />
                       <input
-                        className={`input py-2 ${set.weight < 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
+                        className={`input py-2 ${set.weight < 0 && fieldErrors.sets ? 'field-invalid' : ''}`}
                         type="text"
                         inputMode="decimal"
                         value={toNumericString(set.weight, '0')}

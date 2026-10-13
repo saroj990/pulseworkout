@@ -60,10 +60,10 @@ export function PinLockScreen() {
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <span
               key={i}
-              className={`h-3.5 w-3.5 rounded-full border-2 transition ${
+              className={`h-3.5 w-3.5 rounded-full transition ${
                 i < pin.length
-                  ? 'border-[var(--brand)] bg-[var(--brand)]'
-                  : 'border-[var(--line)] bg-white'
+                  ? 'bg-[var(--brand)] shadow-[0_0_0_3px_var(--brand-soft)]'
+                  : 'bg-[color-mix(in_srgb,var(--ink)_12%,var(--bg-elevated))]'
               }`}
             />
           ))}
@@ -81,7 +81,7 @@ export function PinLockScreen() {
                 <button
                   key={key}
                   type="button"
-                  className="flex h-16 items-center justify-center rounded-2xl bg-white text-[var(--ink-muted)] border border-[var(--line)] active:scale-95"
+                  className="flex h-16 items-center justify-center rounded-2xl surface-elevated text-[var(--ink-muted)] shadow-[var(--shadow)] active:scale-95"
                   onClick={() => press('del')}
                   aria-label="Delete"
                   disabled={busy}
@@ -94,7 +94,7 @@ export function PinLockScreen() {
               <button
                 key={key}
                 type="button"
-                className="flex h-16 items-center justify-center rounded-2xl bg-white text-xl font-bold border border-[var(--line)] active:scale-95 hover:border-[var(--brand)]"
+                className="interactive-surface flex h-16 items-center justify-center rounded-2xl surface-elevated text-xl font-bold shadow-[var(--shadow)] active:scale-95"
                 onClick={() => press(key)}
                 disabled={busy}
               >

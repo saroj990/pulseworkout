@@ -88,14 +88,14 @@ export function LoginPage() {
           <form
             onSubmit={onSubmit}
             noValidate
-            className="glass mt-8 space-y-4 rounded-[var(--radius)] p-5 shadow-[var(--shadow)] animate-fade-up lg:mt-0"
+            className="app-card mt-8 space-y-4 rounded-[var(--radius)] p-5 shadow-[var(--shadow)] animate-fade-up lg:mt-0"
             style={{ animationDelay: '80ms' }}
           >
             <div>
               <label className="label" htmlFor="name">Name</label>
               <input
                 id="name"
-                className={`input ${fieldErrors.name ? 'border-[var(--danger)]' : ''}`}
+                className={`input ${fieldErrors.name ? 'field-invalid' : ''}`}
                 type="text"
                 autoComplete="username"
                 value={name}
@@ -113,7 +113,7 @@ export function LoginPage() {
               <label className="label" htmlFor="pin">PIN</label>
               <input
                 id="pin"
-                className={`input tracking-[0.35em] ${fieldErrors.pin ? 'border-[var(--danger)]' : ''}`}
+                className={`input tracking-[0.35em] ${fieldErrors.pin ? 'field-invalid' : ''}`}
                 type="password"
                 inputMode="numeric"
                 autoComplete="one-time-code"

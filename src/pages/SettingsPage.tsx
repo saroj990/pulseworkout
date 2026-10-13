@@ -190,7 +190,7 @@ export function SettingsPage() {
           </p>
         )}
 
-        <div className="border-t border-[var(--line)] pt-3 space-y-3">
+        <div className="mt-3 pt-3 space-y-3">
           <label className="label" htmlFor="gid">Google OAuth Client ID (optional)</label>
           <input
             id="gid"
@@ -237,14 +237,14 @@ export function SettingsPage() {
         {!confirmClear ? (
           <button
             type="button"
-            className="btn w-full border border-red-200 bg-red-50 text-[var(--danger)]"
+            className="btn btn-danger-soft w-full"
             onClick={() => setConfirmClear(true)}
             disabled={busy !== null}
           >
             <Trash2 size={16} /> Clear my data
           </button>
         ) : (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-3">
+          <div className="panel-danger-soft space-y-3">
             <p className="text-sm font-semibold text-[var(--danger)]">
               This can’t be undone. Export a CSV first if you want a backup.
             </p>

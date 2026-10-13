@@ -158,7 +158,7 @@ export function ExerciseAdminPage() {
         <p
           className={`rounded-xl px-3 py-2 text-sm font-semibold ${
             error
-              ? 'border border-[var(--danger)]/25 bg-[color-mix(in_srgb,var(--danger)_10%,var(--bg-elevated))] text-[var(--danger)]'
+              ? 'alert-error'
               : 'bg-[var(--brand-soft)] text-[var(--brand)]'
           }`}
         >

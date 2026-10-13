@@ -52,7 +52,7 @@ export function SaveWorkoutToPlanModal({
               className={`rounded-xl py-2 text-center text-[0.65rem] font-bold ${
                 weekday === wd
                   ? 'bg-[var(--brand)] text-white'
-                  : 'border border-[var(--line)] bg-white'
+                  : 'surface-elevated text-[var(--ink-muted)]'
               }`}
               onClick={() => setWeekday(wd)}
             >
