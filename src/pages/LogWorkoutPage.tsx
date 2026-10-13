@@ -24,7 +24,8 @@ import {
   resolveExerciseName,
 } from '../data/exerciseLibrary'
 import { filterExercisesForBrowse } from '../lib/exerciseSearch'
-import { savePlannedWorkout } from '../lib/plannedWorkout'
+import { PlannedWorkoutSummary } from '../components/PlannedWorkoutSummary'
+import { findPlannedWorkoutForDate, savePlannedWorkout } from '../lib/plannedWorkout'
 import { filterVisibleExercises } from '../lib/userExercises'
 import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
@@ -169,6 +170,9 @@ export function LogWorkoutPage() {
     const all = await db.workouts.where('userId').equals(user.id).toArray()
     return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 40)
   }, [user?.id])
+
+  const plannedToday = findPlannedWorkoutForDate(recentWorkouts ?? [], today)
+  const plannedTomorrow = findPlannedWorkoutForDate(recentWorkouts ?? [], tomorrow)
 
   const defaultDuration = String(positiveOrDefault(goals?.dailyMinutes, DEFAULT_DAILY_MINUTES))
 
@@ -1304,6 +1308,21 @@ export function LogWorkoutPage() {
                 Switch to today
               </button>
             )}
+            <div className="pt-2">
+              <p className="text-sm font-bold text-[var(--ink)]">Planned for today &amp; tomorrow</p>
+              <PlannedWorkoutSummary
+                className="mt-2"
+                days={[
+                  { label: 'Today', date: today, workout: plannedToday, logHref: '/log' },
+                  {
+                    label: 'Tomorrow',
+                    date: tomorrow,
+                    workout: plannedTomorrow,
+                    logHref: '/log?plan=tomorrow',
+                  },
+                ]}
+              />
+            </div>
           </div>
         </section>
       </div>
@@ -1329,6 +1348,27 @@ export function LogWorkoutPage() {
         </p>
         {!session && <div className="mt-3">{renderWizardSteps()}</div>}
       </header>
+
+      {!session && !existingPlanned && (
+        <section className="app-card animate-fade-up shrink-0 rounded-[var(--radius)] p-4">
+          <p className="text-sm font-bold text-[var(--ink)]">Planned for today &amp; tomorrow</p>
+          <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+            Saved plans from this tab — empty days show as no workout planned.
+          </p>
+          <PlannedWorkoutSummary
+            className="mt-3"
+            days={[
+              { label: 'Today', date: today, workout: plannedToday, logHref: '/log' },
+              {
+                label: 'Tomorrow',
+                date: tomorrow,
+                workout: plannedTomorrow,
+                logHref: '/log?plan=tomorrow',
+              },
+            ]}
+          />
+        </section>
+      )}
 
       {session && (
         <section className="app-card animate-fade-up sticky top-0 z-20 rounded-[var(--radius)] p-3 sm:p-4">

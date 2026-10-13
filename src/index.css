@@ -1223,6 +1223,76 @@ html[data-theme="light"] .home-card {
   color: var(--home-muted);
 }
 
+.home-planned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.home-planned-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.5rem;
+  border-radius: 0.85rem;
+  background: rgb(0 0 0 / 0.18);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+html[data-theme="light"] .home-planned-row {
+  background: color-mix(in srgb, var(--ink) 4%, var(--bg-elevated));
+}
+
+.home-planned-row:active {
+  background: rgb(0 0 0 / 0.28);
+}
+
+.home-planned-label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+.home-planned-title {
+  margin-top: 0.15rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--home-text);
+}
+
+.home-planned-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.15rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--home-muted);
+}
+
+.home-planned-empty {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--home-muted);
+}
+
+.home-badge-planned {
+  border-radius: 9999px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #0c4a6e;
+  background: rgb(96 165 250 / 0.85);
+  white-space: nowrap;
+}
+
 @media (min-width: 380px) {
   .home-checklist-chip {
     flex: 1 1 auto;

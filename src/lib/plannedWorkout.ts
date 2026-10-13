@@ -1,7 +1,14 @@
-import { db, type WorkoutExercise } from '../db'
+import { db, type Workout, type WorkoutExercise } from '../db'
 
 export function isCompletedWorkout(w: { isPlanned?: boolean }): boolean {
   return !w.isPlanned
+}
+
+export function findPlannedWorkoutForDate(
+  workouts: Workout[],
+  date: string,
+): Workout | undefined {
+  return workouts.find((w) => w.date === date && w.isPlanned === true)
 }
 
 export async function savePlannedWorkout(input: {

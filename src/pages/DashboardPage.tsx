@@ -30,7 +30,8 @@ import { imageKeyForExercise } from '../data/exerciseImageKeys'
 import { DEFAULT_WEEKLY_WORKOUTS, positiveOrDefault } from '../data/goals'
 import { getPlanDayForWeekday, type Weekday } from '../data/plans'
 import { readLogPlanWeekdayOverride } from '../lib/logPlanOverride'
-import { isCompletedWorkout } from '../lib/plannedWorkout'
+import { PlannedWorkoutSummary } from '../components/PlannedWorkoutSummary'
+import { findPlannedWorkoutForDate, isCompletedWorkout } from '../lib/plannedWorkout'
 import { DEFAULT_WATER_GOAL_ML, formatWater, waterProgress } from '../lib/water'
 
 function greeting(): string {
@@ -80,6 +81,7 @@ function estKcal(durationMin: number): number {
 export function DashboardPage() {
   const { user, goals, preferences } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
   const firstName = user?.name.split(' ')[0] ?? 'there'
 
   const workouts = useLiveQuery(
@@ -102,7 +104,10 @@ export function DashboardPage() {
   })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  const workoutList = (workouts ?? []).filter(isCompletedWorkout)
+  const allWorkouts = workouts ?? []
+  const workoutList = allWorkouts.filter(isCompletedWorkout)
+  const todayPlanned = findPlannedWorkoutForDate(allWorkouts, today)
+  const tomorrowPlanned = findPlannedWorkoutForDate(allWorkouts, tomorrow)
   const workoutDates = new Set(workoutList.map((w) => w.date))
 
   const thisWeek = workoutList.filter((w) => {
@@ -310,6 +315,31 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="home-card">
+        <div className="flex items-center gap-2">
+          <Calendar size={17} className="text-[var(--home-blue)]" />
+          <span className="home-card-head-title">Planned workouts</span>
+        </div>
+        <p className="home-card-hint mt-1">Sessions you saved in Log for today and tomorrow.</p>
+        <PlannedWorkoutSummary
+          variant="home"
+          days={[
+            {
+              label: 'Today',
+              date: today,
+              workout: todayPlanned,
+              logHref: '/log',
+            },
+            {
+              label: 'Tomorrow',
+              date: tomorrow,
+              workout: tomorrowPlanned,
+              logHref: '/log?plan=tomorrow',
+            },
+          ]}
+        />
       </section>
 
       <section className="home-card home-card--focus">
