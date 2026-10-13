@@ -209,7 +209,7 @@ export function PlansPage() {
             className={`shrink-0 rounded-full px-2.5 py-1.5 text-xs font-bold sm:px-3 sm:text-sm ${
               mode === tab.id
                 ? 'bg-[var(--brand)] text-white'
-                : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+                : 'surface-elevated text-[var(--ink-muted)]'
             }`}
           >
             {tab.label}
@@ -228,7 +228,7 @@ export function PlansPage() {
           {PLAN_TEMPLATES.map((t, i) => (
             <article
               key={t.id}
-              className="glass animate-slide-in rounded-[var(--radius)] p-4"
+              className="app-card animate-slide-in rounded-[var(--radius)] p-4"
               style={{ animationDelay: `${i * 40}ms` }}
             >
               <div className="flex items-start justify-between gap-3">
@@ -256,7 +256,7 @@ export function PlansPage() {
                     d.muscles.length === 0 ? (
                       <div
                         key={d.weekday}
-                        className="week-day border border-[var(--line)] bg-white text-[var(--ink-muted)]"
+                        className="week-day surface-elevated bg-white text-[var(--ink-muted)]"
                         title="Rest"
                       >
                         <p className="week-day__name">{WEEKDAY_LABELS[d.weekday]}</p>
@@ -294,7 +294,7 @@ export function PlansPage() {
 
       {mode === 'custom' && (
         <div className="space-y-4 animate-fade-up">
-          <div className="glass rounded-[var(--radius)] p-4">
+          <div className="app-card rounded-[var(--radius)] p-4">
             <label className="label" htmlFor="plan-name">
               Plan name
             </label>
@@ -316,13 +316,13 @@ export function PlansPage() {
                 key={d.weekday}
                 type="button"
                 onClick={() => setEditingWeekday(d.weekday)}
-                className="glass flex w-full items-center gap-3 rounded-2xl p-3 text-left"
+                className="app-card flex w-full items-center gap-3 rounded-2xl p-3 text-left"
               >
                 <div
                   className={`flex h-11 w-11 flex-col items-center justify-center rounded-xl text-xs font-extrabold ${
                     d.muscles.length
                       ? 'bg-[var(--brand)] text-white'
-                      : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+                      : 'surface-elevated text-[var(--ink-muted)]'
                   }`}
                 >
                   {WEEKDAY_LABELS[d.weekday]}
@@ -356,7 +356,7 @@ export function PlansPage() {
             return (
               <div
                 key={m}
-                className="glass animate-slide-in rounded-[var(--radius)] p-4"
+                className="app-card animate-slide-in rounded-[var(--radius)] p-4"
                 style={{ animationDelay: `${i * 30}ms` }}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -412,7 +412,7 @@ export function PlansPage() {
                     className={`rounded-full px-3 py-1.5 text-sm font-bold ${
                       on
                         ? 'bg-[var(--brand)] text-white'
-                        : 'bg-white border border-[var(--line)]'
+                        : 'surface-elevated'
                     }`}
                   >
                     {MUSCLE_LABELS[m]}
@@ -460,7 +460,7 @@ function ActivePlanCard({ plan }: { plan: UserPlan }) {
 
   return (
     <section
-      className="glass animate-fade-up rounded-[var(--radius)] shadow-[var(--shadow)]"
+      className="app-card animate-fade-up rounded-[var(--radius)] shadow-[var(--shadow)]"
       style={{ padding: 'var(--card-pad)' }}
     >
       <div className="flex items-center gap-2 text-[var(--brand)]">
@@ -482,7 +482,7 @@ function ActivePlanCard({ plan }: { plan: UserPlan }) {
                 className={`week-day ${isToday ? 'week-day--today' : ''} ${
                   d.muscles.length
                     ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                    : 'border border-[var(--line)] bg-white text-[var(--ink-muted)]'
+                    : 'surface-elevated bg-white text-[var(--ink-muted)]'
                 }`}
                 title={d.muscles.length ? d.title : 'Rest'}
               >

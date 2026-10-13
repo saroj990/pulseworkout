@@ -210,7 +210,7 @@ export function ExerciseImage({
     <div
       ref={rootRef}
       className={`relative shrink-0 overflow-hidden rounded-2xl ${SIZES[size]} ${className} ${
-        showVideo || isHero ? 'ring-1 ring-black/5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]' : ''
+        showVideo || isHero ? 'shadow-[0_4px_14px_rgb(0_0_0/0.12)]' : ''
       }`}
       style={{
         background: `linear-gradient(145deg, ${color}22 0%, ${color}55 100%)`,

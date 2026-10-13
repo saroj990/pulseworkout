@@ -75,7 +75,7 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className={`inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white transition hover:border-[var(--brand)] ${
+        className={`inline-flex items-center gap-2 rounded-full bg-[var(--bg-elevated)] shadow-[var(--shadow)] transition hover:shadow-[0_0_0_2px_var(--brand-soft)] ${
           compact ? 'p-1' : 'pl-1.5 pr-3 py-1'
         }`}
         onClick={() => {
@@ -104,9 +104,9 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 w-[min(18.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-[var(--shadow)] animate-fade-up"
+          className="absolute right-0 z-50 mt-2 w-[min(18.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl app-card animate-fade-up p-0 shadow-[var(--shadow)]"
         >
-          <div className="border-b border-[var(--line)] px-4 py-3">
+          <div className="px-4 py-3">
             <p className="truncate font-bold">{user?.name}</p>
             <p className="truncate text-xs text-[var(--ink-muted)]">Signed in on this device</p>
           </div>
@@ -135,7 +135,7 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
                 Clear my data
               </button>
             ) : (
-              <div className="rounded-xl bg-red-50 p-3">
+              <div className="panel-danger-soft">
                 <p className="text-xs font-semibold text-[var(--danger)]">
                   Delete workouts, water logs, and plans? Account stays signed in.
                 </p>
@@ -176,8 +176,8 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
 
           {(message || error) && (
             <p
-              className={`border-t border-[var(--line)] px-4 py-2 text-xs font-semibold ${
-                error ? 'bg-red-50 text-[var(--danger)]' : 'bg-[var(--brand-soft)] text-[var(--brand)]'
+              className={`px-4 py-2 text-xs font-semibold ${
+                error ? 'alert-error mx-2 mb-2 rounded-lg' : 'mx-2 mb-2 rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]'
               }`}
             >
               {error || message}

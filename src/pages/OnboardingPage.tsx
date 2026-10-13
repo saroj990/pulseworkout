@@ -69,7 +69,7 @@ export function OnboardingPage() {
       </div>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-6 animate-fade-up" style={{ animationDelay: '60ms' }}>
-        <section className="glass rounded-[var(--radius)] p-5">
+        <section className="app-card rounded-[var(--radius)] p-5">
           <label className="label">Units</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {(['kg', 'lbs'] as const).map((u) => (
@@ -80,7 +80,7 @@ export function OnboardingPage() {
                 className={`rounded-xl px-4 py-3 font-bold ${
                   units === u
                     ? 'bg-[var(--brand)] text-white'
-                    : 'bg-white border border-[var(--line)]'
+                    : 'surface-elevated'
                 }`}
               >
                 {u.toUpperCase()}
@@ -89,7 +89,7 @@ export function OnboardingPage() {
           </div>
         </section>
 
-        <section className="glass rounded-[var(--radius)] p-5 space-y-4">
+        <section className="app-card rounded-[var(--radius)] p-5 space-y-4">
           <div>
             <label className="label" htmlFor="weekly">How many days a week?</label>
             <input
@@ -137,7 +137,7 @@ export function OnboardingPage() {
           </div>
         </section>
 
-        <section className="glass rounded-[var(--radius)] p-5">
+        <section className="app-card rounded-[var(--radius)] p-5">
           <label className="label">Preferred muscles</label>
           <div className="mt-3 flex flex-wrap gap-2">
             {OPTIONS.map((m) => {
@@ -150,7 +150,7 @@ export function OnboardingPage() {
                   className={`rounded-full px-3 py-1.5 text-sm font-bold transition ${
                     on
                       ? 'bg-[var(--brand)] text-white'
-                      : 'bg-white border border-[var(--line)] text-[var(--ink-muted)]'
+                      : 'surface-elevated text-[var(--ink-muted)]'
                   }`}
                 >
                   {MUSCLE_LABELS[m]}

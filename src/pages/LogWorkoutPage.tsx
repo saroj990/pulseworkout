@@ -24,7 +24,8 @@ import {
   resolveExerciseName,
 } from '../data/exerciseLibrary'
 import { filterExercisesForBrowse } from '../lib/exerciseSearch'
-import { savePlannedWorkout } from '../lib/plannedWorkout'
+import { PlannedWorkoutSummary } from '../components/PlannedWorkoutSummary'
+import { findPlannedWorkoutForDate, savePlannedWorkout } from '../lib/plannedWorkout'
 import { filterVisibleExercises } from '../lib/userExercises'
 import { upsertActivePlanDay } from '../lib/planStorage'
 import { useAuth } from '../context/AuthContext'
@@ -169,6 +170,9 @@ export function LogWorkoutPage() {
     const all = await db.workouts.where('userId').equals(user.id).toArray()
     return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 40)
   }, [user?.id])
+
+  const plannedToday = findPlannedWorkoutForDate(recentWorkouts ?? [], today)
+  const plannedTomorrow = findPlannedWorkoutForDate(recentWorkouts ?? [], tomorrow)
 
   const defaultDuration = String(positiveOrDefault(goals?.dailyMinutes, DEFAULT_DAILY_MINUTES))
 
@@ -605,7 +609,7 @@ export function LogWorkoutPage() {
         </button>
         <button
           type="button"
-          className="shrink-0 border-l border-[var(--line)] px-2.5 text-[var(--brand)] hover:bg-[var(--brand-soft)]"
+          className="shrink-0 rounded-lg bg-[color-mix(in_srgb,var(--brand)_10%,var(--bg-elevated))] px-2.5 text-[var(--brand)] hover:bg-[var(--brand-soft)]"
           aria-label={`Save ${label} to plan`}
           onClick={() => openSavePresetToPlan(title, exerciseNames, muscles)}
         >
@@ -783,7 +787,7 @@ export function LogWorkoutPage() {
                             type="button"
                             onClick={() => addExercise(ex)}
                             disabled={added}
-                            className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
+                            className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left interactive-surface disabled:opacity-55 ${
                               compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                             }`}
                           >
@@ -820,7 +824,7 @@ export function LogWorkoutPage() {
                       type="button"
                       onClick={() => addExercise(ex)}
                       disabled={added}
-                      className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left hover:border-[var(--brand)] disabled:opacity-55 ${
+                      className={`flex w-full items-center gap-2 rounded-lg surface-elevated text-left interactive-surface disabled:opacity-55 ${
                         compact ? 'px-2.5 py-2' : 'gap-2.5 rounded-xl p-2.5'
                       }`}
                     >
@@ -1219,7 +1223,7 @@ export function LogWorkoutPage() {
           </p>
         </header>
 
-        <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
+        <section className="app-card animate-fade-up overflow-hidden rounded-[var(--radius)] p-5 space-y-3">
           <div className="rounded-2xl surface-elevated px-4 py-3 text-sm">
             <p className="font-bold text-[var(--ink)]">{existingForDate.title}</p>
             <p className="mt-1 text-[var(--ink-muted)]">
@@ -1272,7 +1276,7 @@ export function LogWorkoutPage() {
           </p>
         </header>
 
-        <section className="glass animate-fade-up overflow-hidden rounded-[var(--radius)]">
+        <section className="app-card animate-fade-up overflow-hidden rounded-[var(--radius)]">
           <div className="bg-[linear-gradient(135deg,var(--brand)_0%,#0b5550_100%)] px-5 py-6 text-white">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
               <CircleCheck size={22} />
@@ -1304,6 +1308,21 @@ export function LogWorkoutPage() {
                 Switch to today
               </button>
             )}
+            <div className="pt-2">
+              <p className="text-sm font-bold text-[var(--ink)]">Planned for today &amp; tomorrow</p>
+              <PlannedWorkoutSummary
+                className="mt-2"
+                days={[
+                  { label: 'Today', date: today, workout: plannedToday, logHref: '/log' },
+                  {
+                    label: 'Tomorrow',
+                    date: tomorrow,
+                    workout: plannedTomorrow,
+                    logHref: '/log?plan=tomorrow',
+                  },
+                ]}
+              />
+            </div>
           </div>
         </section>
       </div>
@@ -1330,8 +1349,29 @@ export function LogWorkoutPage() {
         {!session && <div className="mt-3">{renderWizardSteps()}</div>}
       </header>
 
+      {!session && !existingPlanned && (
+        <section className="app-card animate-fade-up shrink-0 rounded-[var(--radius)] p-4">
+          <p className="text-sm font-bold text-[var(--ink)]">Planned for today &amp; tomorrow</p>
+          <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+            Saved plans from this tab — empty days show as no workout planned.
+          </p>
+          <PlannedWorkoutSummary
+            className="mt-3"
+            days={[
+              { label: 'Today', date: today, workout: plannedToday, logHref: '/log' },
+              {
+                label: 'Tomorrow',
+                date: tomorrow,
+                workout: plannedTomorrow,
+                logHref: '/log?plan=tomorrow',
+              },
+            ]}
+          />
+        </section>
+      )}
+
       {session && (
-        <section className="glass animate-fade-up sticky top-0 z-20 rounded-[var(--radius)] p-3 sm:p-4">
+        <section className="app-card animate-fade-up sticky top-0 z-20 rounded-[var(--radius)] p-3 sm:p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]">
               <Timer size={18} />
@@ -1424,12 +1464,12 @@ export function LogWorkoutPage() {
         noValidate
       >
         {!session && logStep === 'details' && (
-          <section className="glass animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
+          <section className="app-card animate-fade-up rounded-[var(--radius)] p-4 space-y-3">
             <div>
               <label className="label" htmlFor="title">Title</label>
               <input
                 id="title"
-                className={`input ${fieldErrors.title ? 'border-[var(--danger)]' : ''}`}
+                className={`input ${fieldErrors.title ? 'field-invalid' : ''}`}
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value)
@@ -1473,7 +1513,7 @@ export function LogWorkoutPage() {
                 <label className="label" htmlFor="date">Date</label>
                 <input
                   id="date"
-                  className={`input w-full ${fieldErrors.date ? 'border-[var(--danger)]' : ''}`}
+                  className={`input w-full ${fieldErrors.date ? 'field-invalid' : ''}`}
                   type="date"
                   min={today}
                   max={tomorrow}
@@ -1490,7 +1530,7 @@ export function LogWorkoutPage() {
                 <label className="label" htmlFor="duration">Minutes</label>
                 <input
                   id="duration"
-                  className={`input w-full ${fieldErrors.duration ? 'border-[var(--danger)]' : ''}`}
+                  className={`input w-full ${fieldErrors.duration ? 'field-invalid' : ''}`}
                   type="text"
                   inputMode="numeric"
                   value={duration}
@@ -1511,7 +1551,7 @@ export function LogWorkoutPage() {
 
         {!session && logStep === 'template' && (
           <>
-          <section className="glass animate-fade-up flex min-h-0 flex-col overflow-hidden rounded-[var(--radius)]">
+          <section className="app-card animate-fade-up flex min-h-0 flex-col overflow-hidden rounded-[var(--radius)]">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pb-2 max-h-[min(42dvh,22rem)] sm:max-h-[min(58dvh,30rem)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1582,8 +1622,8 @@ export function LogWorkoutPage() {
                           selected
                             ? 'bg-[var(--brand)] text-white shadow-sm'
                             : isRest
-                              ? 'border border-dashed border-[var(--line)] bg-[var(--bg)] text-[var(--ink-muted)]'
-                              : 'surface-elevated hover:border-[var(--brand)]'
+                              ? 'bg-[color-mix(in_srgb,var(--ink)_6%,var(--bg))] text-[var(--ink-muted)] opacity-90'
+                              : 'surface-elevated interactive-surface'
                         }`}
                         onClick={() => selectPlanWeekday(wd)}
                       >
@@ -1668,7 +1708,7 @@ export function LogWorkoutPage() {
             </div>
             </div>
           </section>
-          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] grid-cols-2 gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
+          <div className="fixed inset-x-0 z-20 grid max-w-[34rem] grid-cols-2 gap-2 bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
             <button
               type="button"
               className="btn btn-secondary w-full min-w-0 px-2 text-xs sm:text-sm"
@@ -1690,7 +1730,7 @@ export function LogWorkoutPage() {
 
         {!session && logStep === 'exercises' && (
           <>
-            <section className="glass shrink-0 rounded-[var(--radius)] px-3 py-2 sm:p-3 sm:space-y-2">
+            <section className="app-card shrink-0 rounded-[var(--radius)] px-3 py-2 sm:p-3 sm:space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <p className="min-w-0 flex-1 truncate font-bold">{title}</p>
                 <button
@@ -1742,12 +1782,12 @@ export function LogWorkoutPage() {
                 />
               )}
             </section>
-            <section className="glass flex min-h-[11rem] flex-col overflow-hidden rounded-[var(--radius)] p-3 sm:h-[min(42dvh,22rem)]">
+            <section className="app-card flex min-h-[11rem] flex-col overflow-hidden rounded-[var(--radius)] p-3 sm:h-[min(42dvh,22rem)]">
               <h2 className="mb-1 shrink-0 font-display text-sm font-bold sm:mb-2">Find & add</h2>
               {renderExerciseBrowser('min-h-0 flex-1', true)}
             </section>
             {selected.length > 0 && (
-              <section className="glass shrink-0 space-y-2 rounded-[var(--radius)] p-3 sm:hidden">
+              <section className="app-card shrink-0 space-y-2 rounded-[var(--radius)] p-3 sm:hidden">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold">{selected.length} in workout</p>
                   <button
@@ -1830,8 +1870,8 @@ export function LogWorkoutPage() {
 
         {(session || logStep === 'exercises') && selected.length === 0 && (
           <p
-            className={`rounded-xl border border-dashed px-4 py-4 text-center text-sm text-[var(--ink-muted)] sm:py-6 ${
-              fieldErrors.exercises ? 'border-[var(--danger)]' : 'border-[var(--line)]'
+            className={`empty-placeholder sm:py-6 ${
+              fieldErrors.exercises ? 'state-invalid' : ''
             } ${isPickStep ? 'hidden sm:block' : ''}`}
           >
             Search above and tap exercises to add them here.
@@ -1878,12 +1918,12 @@ export function LogWorkoutPage() {
               }}
               className={`animate-slide-in rounded-[var(--radius)] p-4 transition ${
                 isFocus || isNextUp
-                  ? 'glass ring-2 ring-[var(--brand)] shadow-[0_8px_28px_rgba(15,118,110,0.18)]'
+                  ? 'app-card shadow-[0_8px_28px_rgba(15,118,110,0.22),0_0_0_2px_var(--brand-soft)]'
                   : done
-                    ? 'glass opacity-70'
+                    ? 'app-card opacity-70'
                     : dimmed
-                      ? 'glass opacity-50'
-                      : 'glass'
+                      ? 'app-card opacity-50'
+                      : 'app-card'
               }`}
               style={{ animationDelay: `${exIdx * 40}ms` }}
             >
@@ -1994,7 +2034,7 @@ export function LogWorkoutPage() {
                         {set.completed ? <Check size={14} /> : setIdx + 1}
                       </button>
                       <input
-                        className={`input py-2 ${set.reps <= 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
+                        className={`input py-2 ${set.reps <= 0 && fieldErrors.sets ? 'field-invalid' : ''}`}
                         type="text"
                         inputMode="numeric"
                         value={toNumericString(set.reps, '0')}
@@ -2006,7 +2046,7 @@ export function LogWorkoutPage() {
                         }
                       />
                       <input
-                        className={`input py-2 ${set.weight < 0 && fieldErrors.sets ? 'border-[var(--danger)]' : ''}`}
+                        className={`input py-2 ${set.weight < 0 && fieldErrors.sets ? 'field-invalid' : ''}`}
                         type="text"
                         inputMode="decimal"
                         value={toNumericString(set.weight, '0')}
@@ -2105,7 +2145,7 @@ export function LogWorkoutPage() {
 
         {!session && logStep === 'exercises' ? (
           <>
-            <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 border-t border-[var(--line)] bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
+            <div className="fixed inset-x-0 z-20 grid max-w-[34rem] gap-2 bg-[var(--bg)]/98 px-[var(--page-pad)] py-3 backdrop-blur bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:static sm:inset-auto sm:translate-x-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
               <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
                 {busy ? 'Saving…' : 'Save to weekly plan'}
               </button>

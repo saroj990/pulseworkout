@@ -108,7 +108,7 @@ export function GoalsPage() {
       </header>
 
       <form onSubmit={onSubmit} className="space-y-4 animate-fade-up" style={{ animationDelay: '50ms' }}>
-        <section className="glass rounded-[var(--radius)] p-4 space-y-3">
+        <section className="app-card rounded-[var(--radius)] p-4 space-y-3">
           <h2 className="font-display text-lg font-bold">Goals</h2>
           <div>
             <label className="label" htmlFor="weekly">How many days a week?</label>
@@ -201,7 +201,7 @@ export function GoalsPage() {
           </div>
         </section>
 
-        <section className="glass rounded-[var(--radius)] p-4 space-y-3">
+        <section className="app-card rounded-[var(--radius)] p-4 space-y-3">
           <h2 className="font-display text-lg font-bold">Preferences</h2>
           <div>
             <label className="label">Units</label>
@@ -212,7 +212,7 @@ export function GoalsPage() {
                   type="button"
                   onClick={() => setUnits(u)}
                   className={`rounded-xl px-4 py-3 font-bold ${
-                    units === u ? 'bg-[var(--brand)] text-white' : 'bg-white border border-[var(--line)]'
+                    units === u ? 'bg-[var(--brand)] text-white' : 'surface-elevated text-[var(--ink-muted)]'
                   }`}
                 >
                   {u.toUpperCase()}
@@ -244,7 +244,7 @@ export function GoalsPage() {
                     type="button"
                     onClick={() => toggleMuscle(m)}
                     className={`rounded-full px-3 py-1.5 text-sm font-bold ${
-                      on ? 'bg-[var(--brand)] text-white' : 'bg-white border border-[var(--line)]'
+                      on ? 'bg-[var(--brand)] text-white' : 'surface-elevated text-[var(--ink-muted)]'
                     }`}
                   >
                     {MUSCLE_LABELS[m]}
