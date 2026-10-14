@@ -53,10 +53,8 @@ export function clearWorkoutSession() {
   localStorage.removeItem(SESSION_KEY)
 }
 
-/** Seconds after planned end before asking to complete */
-export const PROMPT_GRACE_SEC = 10 * 60
-/** Seconds after the prompt before force-completing */
-export const AUTO_COMPLETE_AFTER_PROMPT_SEC = 20 * 60
+/** Seconds after planned duration before auto-saving (e.g. 60 min plan → 90 min) */
+export const AUTO_COMPLETE_GRACE_SEC = 30 * 60
 
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
