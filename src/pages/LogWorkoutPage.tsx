@@ -49,9 +49,8 @@ import {
 import { DEFAULT_DAILY_MINUTES, positiveOrDefault } from '../data/goals'
 import { parseNumeric, sanitizeNumericInput, toNumericString } from '../lib/numeric'
 import {
-  AUTO_COMPLETE_AFTER_PROMPT_SEC,
+  AUTO_COMPLETE_GRACE_SEC,
   BETWEEN_EXERCISE_REST_SEC,
-  PROMPT_GRACE_SEC,
   clearWorkoutSession,
   formatClock,
   isExerciseDone,
@@ -428,12 +427,8 @@ export function LogWorkoutPage() {
 
   const elapsedSec = session ? sessionElapsedSec(session, now) : 0
   const targetSec = (session?.durationMin ?? parseNumeric(duration, 0)) * 60
-  const promptAtSec = targetSec + PROMPT_GRACE_SEC
-  const autoCompleteAtSec =
-    session?.promptShownAt != null
-      ? Math.floor((session.promptShownAt - session.startedAt - session.pausedMs) / 1000) +
-        AUTO_COMPLETE_AFTER_PROMPT_SEC
-      : promptAtSec + AUTO_COMPLETE_AFTER_PROMPT_SEC
+  const promptAtSec = targetSec
+  const autoCompleteAtSec = targetSec + AUTO_COMPLETE_GRACE_SEC
 
   const isPaused = Boolean(session?.pausedAt)
   // Use live clock (and floor) so remaining time only counts down — never inflates from a stale `now`
@@ -561,17 +556,19 @@ export function LogWorkoutPage() {
   }, [user?.id, session, duration, date, title, notes, selected, elapsedSec, navigate])
 
   useEffect(() => {
-    if (!session || completingRef.current || isPaused) return
+    if (!session || completingRef.current) return
+
+    if (elapsedSec >= autoCompleteAtSec) {
+      void persistWorkout()
+      return
+    }
+
+    if (isPaused) return
 
     if (elapsedSec >= promptAtSec && !session.promptShownAt) {
       const promptShownAt = Date.now()
       setSession((prev) => (prev ? { ...prev, promptShownAt } : prev))
       setShowCompletePrompt(true)
-      return
-    }
-
-    if (session.promptShownAt && elapsedSec >= autoCompleteAtSec && !completingRef.current) {
-      void persistWorkout()
     }
   }, [session, elapsedSec, promptAtSec, autoCompleteAtSec, persistWorkout, isPaused])
 
@@ -2243,9 +2240,9 @@ export function LogWorkoutPage() {
           <div className="w-full max-w-sm modal-panel rounded-[var(--radius)] p-5 shadow-xl animate-fade-up">
             <h3 className="font-display text-xl font-bold">Wrap up this workout?</h3>
             <p className="mt-2 text-sm text-[var(--ink-muted)]">
-              You’re past your {session.durationMin}-minute target (plus a 10‑minute buffer). Confirm
-              to save now. If there’s no confirmation, it’ll complete automatically in about 20
-              minutes.
+              You’ve reached your {session.durationMin}-minute target. Confirm to save now — completed
+              and incomplete exercises are both kept. If you don’t respond, the session auto-saves{' '}
+              {AUTO_COMPLETE_GRACE_SEC / 60} minutes after your planned time.
             </p>
             <div className="mt-5 grid gap-2">
               <button
