@@ -330,13 +330,13 @@ export function DashboardPage() {
               label: 'Today',
               date: today,
               workout: todayPlanned,
-              logHref: '/log',
+              logHref: '/log?edit=1',
             },
             {
               label: 'Tomorrow',
               date: tomorrow,
               workout: tomorrowPlanned,
-              logHref: '/log?plan=tomorrow',
+              logHref: '/log?plan=tomorrow&edit=1',
             },
           ]}
         />

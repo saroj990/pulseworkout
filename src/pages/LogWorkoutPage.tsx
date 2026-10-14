@@ -203,6 +203,7 @@ export function LogWorkoutPage() {
   const [pickListOpen, setPickListOpen] = useState(false)
   const [showPickNotes, setShowPickNotes] = useState(false)
   const [showMuscleFilters, setShowMuscleFilters] = useState(false)
+  const [isEditingPlanned, setIsEditingPlanned] = useState(false)
 
   useEffect(() => {
     if (logStep !== 'exercises') {
@@ -217,7 +218,14 @@ export function LogWorkoutPage() {
     setDate(tomorrow)
     setTitle(`Workout — ${format(addDays(new Date(), 1), 'MMM d')}`)
     setLogStep('details')
+    setIsEditingPlanned(false)
   }, [searchParams, tomorrow])
+
+  const autoEditPlanId = useRef<number | null>(null)
+
+  useEffect(() => {
+    autoEditPlanId.current = null
+  }, [searchParams])
 
   const existingForDate = useLiveQuery(async () => {
     if (!user?.id || !date) return undefined
@@ -234,6 +242,9 @@ export function LogWorkoutPage() {
   const isToday = date === today
   const isTomorrow = date === tomorrow
   const isPlanningAhead = date > today
+  const isPlanDay = isToday || isTomorrow
+  const showPlannedSave =
+    isPlanDay && (isPlanningAhead || isEditingPlanned || existingPlanned)
 
   const calendarWeekday = useMemo(() => {
     const d = new Date(`${date}T12:00:00`)
@@ -295,6 +306,21 @@ export function LogWorkoutPage() {
     prefillsApplied.current = true
     setLogStep('exercises')
   }, [user?.id])
+
+  useEffect(() => {
+    if (searchParams.get('edit') !== '1' || !existingForDate?.isPlanned || session) return
+    if (existingForDate.id != null && autoEditPlanId.current === existingForDate.id) return
+    autoEditPlanId.current = existingForDate.id ?? null
+    setDate(existingForDate.date)
+    setTitle(existingForDate.title)
+    setNotes(existingForDate.notes)
+    setDuration(String(existingForDate.durationMin))
+    setSelected(existingForDate.exercises)
+    setLogStep('details')
+    setIsEditingPlanned(true)
+    setMessage('')
+    setError('')
+  }, [searchParams, existingForDate, session])
 
   // Keep a stable tick while a session is open — don't reset the interval on every session field change
   const sessionActive = Boolean(session)
@@ -1040,17 +1066,24 @@ export function LogWorkoutPage() {
     setTitle(`Workout — ${format(new Date(`${d}T12:00:00`), 'MMM d')}`)
     clearFieldError('date')
     setError('')
+    setIsEditingPlanned(false)
+  }
+
+  function loadPlannedIntoWizard(workout: NonNullable<typeof existingForDate>) {
+    setDate(workout.date)
+    setTitle(workout.title)
+    setNotes(workout.notes)
+    setDuration(String(workout.durationMin))
+    setSelected(workout.exercises)
+    setLogStep('details')
+    setIsEditingPlanned(true)
+    setMessage('')
+    setError('')
   }
 
   function editPlannedWorkout() {
     if (!existingForDate?.isPlanned) return
-    setTitle(existingForDate.title)
-    setNotes(existingForDate.notes)
-    setDuration(String(existingForDate.durationMin))
-    setSelected(existingForDate.exercises)
-    setLogStep('exercises')
-    setError('')
-    setMessage('')
+    loadPlannedIntoWizard(existingForDate)
   }
 
   async function deletePlannedWorkout() {
@@ -1059,6 +1092,7 @@ export function LogWorkoutPage() {
     try {
       await db.workouts.delete(existingForDate.id)
       setSelected([])
+      setIsEditingPlanned(false)
       setMessage('Plan removed.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove plan')
@@ -1082,8 +1116,8 @@ export function LogWorkoutPage() {
       setError('Add a title and at least one exercise to save your plan.')
       return
     }
-    if (!isPlanningAhead) {
-      setError('Pick tomorrow (or a future date) to save a plan ahead of time.')
+    if (!isPlanDay) {
+      setError('Plans can only be saved for today or tomorrow.')
       return
     }
 
@@ -1100,7 +1134,14 @@ export function LogWorkoutPage() {
         exercises: selected,
         existingPlannedId: existingForDate?.isPlanned ? existingForDate.id : undefined,
       })
-      setMessage(isTomorrow ? 'Tomorrow’s workout is planned.' : 'Workout plan saved.')
+      setIsEditingPlanned(false)
+      setMessage(
+        isEditingPlanned
+          ? 'Plan updated.'
+          : isTomorrow
+            ? 'Tomorrow’s workout is planned.'
+            : 'Today’s workout is planned.',
+      )
       navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save plan')
@@ -1212,7 +1253,7 @@ export function LogWorkoutPage() {
     'full',
   ]
 
-  if (existingPlanned && existingForDate && !session) {
+  if (existingPlanned && existingForDate && !session && !isEditingPlanned) {
     return (
       <div className="space-y-5">
         <header className="animate-fade-up">
@@ -1238,13 +1279,8 @@ export function LogWorkoutPage() {
               type="button"
               className="btn btn-accent w-full"
               onClick={() => {
-                setTitle(existingForDate.title)
-                setNotes(existingForDate.notes)
-                setDuration(String(existingForDate.durationMin))
-                setSelected(existingForDate.exercises)
+                loadPlannedIntoWizard(existingForDate)
                 setLogStep('exercises')
-                setMessage('')
-                setError('')
               }}
             >
               Open to start
@@ -1313,12 +1349,12 @@ export function LogWorkoutPage() {
               <PlannedWorkoutSummary
                 className="mt-2"
                 days={[
-                  { label: 'Today', date: today, workout: plannedToday, logHref: '/log' },
+                  { label: 'Today', date: today, workout: plannedToday, logHref: '/log?edit=1' },
                   {
                     label: 'Tomorrow',
                     date: tomorrow,
                     workout: plannedTomorrow,
-                    logHref: '/log?plan=tomorrow',
+                    logHref: '/log?plan=tomorrow&edit=1',
                   },
                 ]}
               />
@@ -1333,23 +1369,34 @@ export function LogWorkoutPage() {
     <div className="flex min-h-0 flex-col gap-4 sm:gap-5">
       <header className="animate-fade-up shrink-0">
         <h1 className="font-display text-2xl font-extrabold text-[var(--ink)] sm:text-3xl">
-          {session ? title : 'Log workout'}
+          {session ? title : isEditingPlanned ? 'Edit plan' : 'Log workout'}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           {session
             ? 'Mark each exercise done — 1 min rest between them (skippable).'
             : logStep === 'details'
-              ? isPlanningAhead
-                ? 'Step 1 — plan a session for tomorrow (or pick another date).'
-                : 'Step 1 — set the basics for this session.'
+              ? isEditingPlanned
+                ? 'Step 1 — update title, date, or duration for this plan.'
+                : isPlanningAhead
+                  ? 'Step 1 — plan a session for tomorrow (or pick another date).'
+                  : 'Step 1 — set the basics for this session.'
               : logStep === 'template'
                 ? 'Step 2 — load a template or skip to pick exercises yourself.'
                 : 'Step 3 — search and add exercises, then start.'}
         </p>
         {!session && <div className="mt-3">{renderWizardSteps()}</div>}
+        {!session && isEditingPlanned && (
+          <button
+            type="button"
+            className="btn btn-ghost mt-2 text-sm"
+            onClick={() => setIsEditingPlanned(false)}
+          >
+            Cancel editing
+          </button>
+        )}
       </header>
 
-      {!session && !existingPlanned && (
+      {!session && !existingPlanned && !isEditingPlanned && (
         <section className="app-card animate-fade-up shrink-0 rounded-[var(--radius)] p-4">
           <p className="text-sm font-bold text-[var(--ink)]">Planned for today &amp; tomorrow</p>
           <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
@@ -1358,12 +1405,12 @@ export function LogWorkoutPage() {
           <PlannedWorkoutSummary
             className="mt-3"
             days={[
-              { label: 'Today', date: today, workout: plannedToday, logHref: '/log' },
+              { label: 'Today', date: today, workout: plannedToday, logHref: '/log?edit=1' },
               {
                 label: 'Tomorrow',
                 date: tomorrow,
                 workout: plannedTomorrow,
-                logHref: '/log?plan=tomorrow',
+                logHref: '/log?plan=tomorrow&edit=1',
               },
             ]}
           />
@@ -2149,14 +2196,20 @@ export function LogWorkoutPage() {
               <button type="submit" className="btn btn-secondary w-full" disabled={busy}>
                 {busy ? 'Saving…' : 'Save to weekly plan'}
               </button>
-              {isPlanningAhead ? (
+              {showPlannedSave ? (
                 <button
                   type="button"
                   className="btn btn-primary w-full"
                   disabled={busy}
                   onClick={() => void onSavePlannedWorkout()}
                 >
-                  {busy ? 'Saving…' : isTomorrow ? 'Save for tomorrow' : 'Save plan'}
+                  {busy
+                    ? 'Saving…'
+                    : isEditingPlanned
+                      ? 'Update plan'
+                      : isTomorrow
+                        ? 'Save for tomorrow'
+                        : 'Save plan for today'}
                 </button>
               ) : (
                 <button
