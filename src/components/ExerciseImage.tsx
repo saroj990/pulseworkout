@@ -89,12 +89,12 @@ interface Props {
   preferVideo?: boolean
 }
 
-/** Mobile-first: video tiles run larger on phones, tighten a bit from `sm` up. */
+/** Compact tiles — SVG/video demos stay readable without dominating the layout. */
 const SIZES = {
-  sm: 'h-9 w-9 sm:h-12 sm:w-12',
-  md: 'h-12 w-12 sm:h-16 sm:w-16',
-  lg: 'h-14 w-14 sm:h-24 sm:w-24',
-  hero: 'aspect-[5/3] w-full max-h-24 sm:aspect-square sm:max-h-36 sm:h-28 sm:w-28 md:max-h-none',
+  sm: 'h-8 w-8 sm:h-10 sm:w-10',
+  md: 'h-10 w-10 sm:h-12 sm:w-12',
+  lg: 'h-11 w-11 sm:h-16 sm:w-16',
+  hero: 'aspect-[5/3] w-full max-h-[4.75rem] sm:aspect-square sm:max-h-28 sm:h-[5.5rem] sm:w-[5.5rem] md:max-h-32',
 }
 
 function StaticIcon({
@@ -115,7 +115,7 @@ function StaticIcon({
       <img
         src={svgUrl}
         alt=""
-        className="absolute inset-[14%] h-[72%] w-[72%] object-contain"
+        className="absolute inset-[16%] h-[68%] w-[68%] object-contain"
         onError={() => setImgFailed(true)}
       />
     )
